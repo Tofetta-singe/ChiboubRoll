@@ -1,15 +1,22 @@
 export const API_BASE = 'https://chiboubroll.onrender.com';
 
 function getHeaders(token) {
-  const h = { 'Content-Type': 'application/json' };
-  if (token) h['Authorization'] = `Bearer ${token}`;
-  return h;
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function parseResponse(res, fallbackMessage) {
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || fallbackMessage);
+  }
+  return res.json();
 }
 
 export async function fetchMe(token) {
   const res = await fetch(`${API_BASE}/api/me`, { headers: getHeaders(token) });
-  if (!res.ok) throw new Error('Unauthorized');
-  return res.json();
+  return parseResponse(res, 'Unauthorized');
 }
 
 export async function doSpin(token) {
@@ -17,11 +24,7 @@ export async function doSpin(token) {
     method: 'POST',
     headers: getHeaders(token),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Spin failed');
-  }
-  return res.json();
+  return parseResponse(res, 'Spin failed');
 }
 
 export async function buyUpgrade(token, upgradeId) {
@@ -30,44 +33,33 @@ export async function buyUpgrade(token, upgradeId) {
     headers: getHeaders(token),
     body: JSON.stringify({ upgradeId }),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Upgrade failed');
-  }
-  return res.json();
+  return parseResponse(res, 'Upgrade failed');
 }
 
 export async function fetchLeaderboard() {
   const res = await fetch(`${API_BASE}/api/leaderboard`);
-  if (!res.ok) throw new Error('Failed to load leaderboard');
-  return res.json();
+  return parseResponse(res, 'Failed to load leaderboard');
 }
 
-// ===== CASES =====
 export async function fetchCases() {
   const res = await fetch(`${API_BASE}/api/cases`);
-  if (!res.ok) throw new Error('Failed to load cases');
-  return res.json();
+  return parseResponse(res, 'Failed to load cases');
 }
 
-export async function openCase(token, caseId) {
+export async function openCase(token, caseId, amount = 1) {
   const res = await fetch(`${API_BASE}/api/cases/open`, {
     method: 'POST',
     headers: getHeaders(token),
-    body: JSON.stringify({ caseId }),
+    body: JSON.stringify({ caseId, amount }),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Échec ouverture de caisse');
-  }
-  return res.json();
+  return parseResponse(res, 'Echec ouverture de caisse');
 }
 
-// ===== INVENTORY =====
 export async function fetchInventory(token) {
-  const res = await fetch(`${API_BASE}/api/inventory`, { headers: getHeaders(token) });
-  if (!res.ok) throw new Error('Failed to load inventory');
-  return res.json();
+  const res = await fetch(`${API_BASE}/api/inventory`, {
+    headers: getHeaders(token),
+  });
+  return parseResponse(res, 'Failed to load inventory');
 }
 
 export async function sellSkin(token, itemId) {
@@ -76,23 +68,30 @@ export async function sellSkin(token, itemId) {
     headers: getHeaders(token),
     body: JSON.stringify({ itemId }),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Échec de la vente');
-  }
-  return res.json();
+  return parseResponse(res, 'Echec de la vente');
 }
 
-// ===== CASE BATTLE =====
 export async function startCaseBattle(token, caseId) {
   const res = await fetch(`${API_BASE}/api/case-battle/start`, {
     method: 'POST',
     headers: getHeaders(token),
     body: JSON.stringify({ caseId }),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Échec du Case Battle');
-  }
-  return res.json();
+  return parseResponse(res, 'Echec du Case Battle');
+}
+
+export async function fetchBattlepass(token) {
+  const res = await fetch(`${API_BASE}/api/battlepass`, {
+    headers: getHeaders(token),
+  });
+  return parseResponse(res, 'Failed to load battlepass');
+}
+
+export async function claimBattlepassTier(token, tierId) {
+  const res = await fetch(`${API_BASE}/api/battlepass/claim`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify({ tierId }),
+  });
+  return parseResponse(res, 'Echec du claim battlepass');
 }

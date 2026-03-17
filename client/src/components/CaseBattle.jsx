@@ -25,7 +25,7 @@ export default function CaseBattle({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      fetchCases().then(data => setCases(data.cases || [])).catch(console.error);
+      fetchCases().then(data => setCases((data.cases || []).filter((item) => item.price > 0))).catch(console.error);
     }
   }, [isOpen]);
 

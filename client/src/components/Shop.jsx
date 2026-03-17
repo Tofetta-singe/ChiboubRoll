@@ -8,7 +8,6 @@ const UPGRADE_CATEGORIES = [
     upgrades: [
       { id: 'extra_wheel',   icon: '🎡', name: 'Roue Supplémentaire', desc: '+1 roue simultanée', baseCost: 150, costScale: 2.8, maxLevel: 3 },
       { id: 'turbo_spin',    icon: '⚡', name: 'Turbo Spin', desc: 'Vitesse de rotation accélérée', baseCost: 100, costScale: 1.5, maxLevel: 3 },
-      { id: 'golden_wheel',  icon: '👑', name: 'Golden Wheels', desc: 'Rend les roues successives dorées (x3)', baseCost: 5000, costScale: 5.0, maxLevel: 2 },
       { id: 'mega_segments', icon: '💎', name: 'Méga Segments', desc: 'Ajoute des segments ultra-riches', baseCost: 1500, costScale: 2.5, maxLevel: 3 },
     ],
   },

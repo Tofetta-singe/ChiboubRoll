@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { fetchCases, openCase, sellSkin } from '../lib/api';
 
@@ -6,14 +6,15 @@ export default function CaseOpening({ isOpen, onClose }) {
   const { token, user, updateUserData } = useAuth();
   const [cases, setCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
+  const [amount, setAmount] = useState(1);
   const [opening, setOpening] = useState(false);
-  const [result, setResult] = useState(null);
+  const [results, setResults] = useState([]);
   const [toast, setToast] = useState(null);
-  const stripRef = useRef(null);
+  const stripRefs = useRef([]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchCases().then(data => setCases(data.cases || [])).catch(console.error);
+      fetchCases().then((data) => setCases(data.cases || [])).catch((error) => showToast(error.message, 'error'));
     }
   }, [isOpen]);
 
@@ -22,237 +23,199 @@ export default function CaseOpening({ isOpen, onClose }) {
     setTimeout(() => setToast(null), 2500);
   };
 
+  const canAfford = useMemo(() => {
+    if (!selectedCase || !user) return false;
+    return user.coins >= selectedCase.price * amount;
+  }, [selectedCase, user, amount]);
+
   const handleOpen = async (caseData) => {
     if (opening) return;
-    if (!user || user.coins < caseData.price) {
+    const nextAmount = caseData.price === 0 ? 1 : amount;
+    if (user.coins < caseData.price * nextAmount) {
       showToast('Pas assez de Chiboub Coins!', 'error');
       return;
     }
 
     setSelectedCase(caseData);
     setOpening(true);
-    setResult(null);
+    setResults([]);
 
     try {
-      const data = await openCase(token, caseData.id);
+      const data = await openCase(token, caseData.id, nextAmount);
       updateUserData({ coins: data.coins });
-
-      // Animate the strip before showing result
-      await animateStrip(data.item, data.strip);
-
-      setResult(data.item);
-    } catch (err) {
-      showToast(err.message, 'error');
+      setResults(data.items || []);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await animateStrips(data.items || []);
+    } catch (error) {
+      showToast(error.message, 'error');
       setSelectedCase(null);
     } finally {
       setOpening(false);
     }
   };
 
-  const animateStrip = (winItem, serverStrip) => {
-    return new Promise((resolve) => {
-      const strip = stripRef.current;
-      if (!strip || !serverStrip) { resolve(); return; }
+  const animateStrips = async (items) => {
+    await Promise.all(items.map((entry, index) => new Promise((resolve) => {
+      const strip = stripRefs.current[index];
+      if (!strip) return resolve();
 
-      // Use the strip from the server
-      const items = serverStrip.map((s, idx) => ({
-        ...s,
-        fake: idx !== 35
-      }));
-
-      // Render strip
       strip.innerHTML = '';
-      items.forEach((item) => {
+      entry.strip.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'case-strip-item';
         div.style.borderColor = item.rarity_color;
-        
-        // Show real image for all items
-        if (item.skin_image) {
-          div.innerHTML = `<img src="${item.skin_image}" alt="" style="width:70px;height:50px;object-fit:contain;margin-bottom:2px;" /><span style="font-size:9px;color:${item.rarity_color};font-weight:bold;text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px">${item.skin_name}</span>`;
-        } else {
-          div.innerHTML = `<div style="width:70px;height:50px;background:${item.rarity_color}22;border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;"><span style="font-size:10px;color:${item.rarity_color}">${item.rarity}</span></div><span style="font-size:9px;color:${item.rarity_color};font-weight:bold;text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px">${item.skin_name}</span>`;
-        }
+        div.innerHTML = `
+          <div style="font-size:10px;font-weight:800;color:${item.rarity_color};text-align:center;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">
+            ${item.skin_name}
+          </div>
+          <div style="font-size:10px;color:#cbd5e1">${item.wear_short} ${Number(item.float_value).toFixed(4)}</div>
+        `;
         strip.appendChild(div);
       });
 
-      // The winning item is at index 35, each item is 100px wide (96px + 4px gap)
-      // We want item 35 centered → offset = 35*100 - container_width/2 + 50
-      const containerWidth = strip.parentElement?.clientWidth || 380;
+      const containerWidth = strip.parentElement?.clientWidth || 900;
       const targetOffset = 35 * 100 - containerWidth / 2 + 50;
-
       strip.style.transition = 'none';
       strip.style.transform = 'translateX(0)';
-
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          strip.style.transition = 'transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1)';
+          strip.style.transition = `transform ${3.5 + index * 0.15}s cubic-bezier(0.15, 0.85, 0.35, 1)`;
           strip.style.transform = `translateX(-${targetOffset}px)`;
         });
       });
-
-      setTimeout(resolve, 3800);
-    });
+      setTimeout(resolve, 3900 + index * 150);
+    })));
   };
 
   const handleSell = async (item) => {
     try {
       const data = await sellSkin(token, item.id);
       updateUserData({ coins: data.coins });
-      showToast(`+${data.soldValue} CC 🪙`, 'success');
-      setResult(null);
-      setSelectedCase(null);
-    } catch (err) {
-      showToast(err.message, 'error');
+      setResults((prev) => prev.filter((entry) => entry.item.id !== item.id));
+      showToast(`+${data.soldValue} CC`, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
     }
-  };
-
-  const handleKeep = () => {
-    showToast('Skin ajouté à l\'inventaire! 🎒', 'success');
-    setResult(null);
-    setSelectedCase(null);
   };
 
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/70 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-50 p-6">
+        <div className="w-full h-full rounded-[32px] bg-dark-900/95 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
+            <div>
+              <h2 className="text-3xl font-black bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Case Opening</h2>
+              <p className="text-sm text-gray-500">Multi-ouverture jusqu a 5 caisses.</p>
+            </div>
+            <button onClick={onClose} className="w-10 h-10 rounded-full glass text-gray-400 hover:text-white">✕</button>
+          </div>
 
-      {/* Panel */}
-      <aside className="fixed top-0 right-0 w-[520px] max-w-full h-full bg-dark-900/95 backdrop-blur-xl border-l border-white/10 z-50 flex flex-col shadow-[-10px_0_40px_rgba(0,0,0,0.5)]">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
-            📦 Ouvrir des Caisses
-          </h2>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full glass flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Opening Animation */}
-          {(opening || result) && selectedCase && (
-            <div className="glass rounded-2xl p-4 border border-white/10">
-              <h3 className="text-center text-sm font-bold text-gray-400 mb-3">
-                {opening ? '🎰 Ouverture en cours...' : '🎉 Résultat!'}
-              </h3>
-
-              {/* Strip container */}
-              <div className="relative overflow-hidden rounded-xl bg-dark-800 h-28 mb-4">
-                {/* Center indicator */}
-                <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10 shadow-[0_0_10px_rgba(245,166,35,0.6)]" />
-                <div className="relative h-full" style={{ overflow: 'hidden' }}>
-                  <div ref={stripRef} className="flex items-center h-full gap-1 absolute top-0 left-0" />
-                </div>
+          <div className="flex-1 overflow-hidden grid grid-cols-[360px_1fr] max-[1100px]:grid-cols-1">
+            <div className="border-r border-white/10 p-5 overflow-y-auto max-[1100px]:border-r-0 max-[1100px]:border-b">
+              <div className="flex gap-2 mb-4">
+                {[1, 2, 3, 4, 5].map((qty) => (
+                  <button
+                    key={qty}
+                    onClick={() => setAmount(qty)}
+                    className={`flex-1 rounded-xl py-2 text-sm font-bold ${amount === qty ? 'bg-orange-500 text-white' : 'bg-white/5 text-gray-400'}`}
+                  >
+                    {qty}x
+                  </button>
+                ))}
               </div>
 
-              {/* Result display */}
-              {result && (
-                <div className="flex flex-col items-center gap-3 animate-pop">
-                  <div
-                    className="p-3 rounded-xl border-2 bg-dark-800"
-                    style={{ borderColor: result.rarity_color }}
-                  >
-                    {result.skin_image && (
-                      <img
-                        src={result.skin_image}
-                        alt={result.skin_name}
-                        className="w-32 h-24 object-contain mx-auto mb-2"
-                      />
-                    )}
-                    <p className="text-sm font-bold text-center" style={{ color: result.rarity_color }}>
-                      {result.skin_name}
-                    </p>
-                    <p className="text-xs text-center font-semibold" style={{ color: result.rarity_color + 'aa' }}>
-                      {result.rarity}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-400">Valeur:</span>
-                    <span className="text-yellow-400 font-bold">🪙 {result.sell_value} CC</span>
-                  </div>
-
-                  <div className="flex gap-3 w-full">
+              <div className="space-y-3">
+                {cases.map((caseData) => {
+                  const price = caseData.price * (caseData.price === 0 ? 1 : amount);
+                  return (
                     <button
-                      onClick={() => handleSell(result)}
-                      className="flex-1 bg-gradient-to-br from-yellow-500 to-amber-600 text-dark-900 font-bold py-2.5 rounded-xl text-sm hover:-translate-y-0.5 hover:shadow-[0_4px_15px_rgba(245,166,35,0.3)] transition-all"
+                      key={caseData.id}
+                      onClick={() => handleOpen(caseData)}
+                      className="w-full p-4 rounded-2xl border border-white/10 bg-white/[0.03] text-left hover:bg-white/[0.05]"
                     >
-                      💰 Vendre ({result.sell_value} CC)
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl" style={{ background: `${caseData.color}22` }}>
+                          {caseData.icon}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-black text-sm" style={{ color: caseData.color }}>{caseData.name}</div>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {caseData.drops.map((drop) => (
+                              <span key={drop.rarity} className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: `${drop.color}22`, color: drop.color }}>
+                                {drop.rarity}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-yellow-400 font-black">{price} CC</div>
+                      </div>
                     </button>
-                    <button
-                      onClick={handleKeep}
-                      className="flex-1 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white font-bold py-2.5 rounded-xl text-sm hover:-translate-y-0.5 hover:shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all"
-                    >
-                      🎒 Garder
-                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              {selectedCase && (
+                <div className="mb-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.3em] text-gray-500 font-black">Selection</div>
+                      <div className="text-2xl font-black text-white mt-1">{selectedCase.name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">Total</div>
+                      <div className="text-2xl font-black text-yellow-400">{selectedCase.price * (selectedCase.price === 0 ? 1 : amount)} CC</div>
+                    </div>
                   </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Case list */}
-          {!opening && !result && (
-            <div className="space-y-3">
-              {cases.map((c) => {
-                const canAfford = user && user.coins >= c.price;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => handleOpen(c)}
-                    disabled={!canAfford}
-                    className={`w-full p-4 rounded-2xl border transition-all duration-200 text-left ${
-                      canAfford
-                        ? 'border-white/10 hover:border-white/30 hover:-translate-x-1 hover:shadow-[4px_0_20px_rgba(0,0,0,0.2)] cursor-pointer bg-white/[0.03]'
-                        : 'border-white/5 opacity-40 cursor-not-allowed bg-white/[0.02]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="text-3xl w-14 h-14 flex items-center justify-center rounded-xl"
-                        style={{ background: c.color + '22', border: `2px solid ${c.color}44` }}
-                      >
-                        {c.icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-sm" style={{ color: c.color }}>
-                          {c.name}
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {c.drops.map((d) => (
-                            <span
-                              key={d.rarity}
-                              className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                              style={{ background: d.color + '22', color: d.color, border: `1px solid ${d.color}33` }}
-                            >
-                              {d.rarity} ({d.chance}%)
-                            </span>
-                          ))}
+              {(opening || results.length > 0) ? (
+                <div className="space-y-6">
+                  {results.map((entry, index) => (
+                    <div key={entry.item.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-28 mb-4">
+                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10" />
+                        <div className="relative h-full overflow-hidden">
+                          <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-1 absolute top-0 left-0" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 font-bold text-yellow-400 text-sm shrink-0">
-                        🪙 {c.price}
+
+                      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-dark-950/70 p-4">
+                        <div>
+                          <div className="text-sm font-black" style={{ color: entry.item.rarity_color }}>{entry.item.skin_name}</div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {entry.item.rarity} • {entry.item.wear_short} • {Number(entry.item.float_value).toFixed(4)}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-yellow-400 font-black">{entry.item.sell_value} CC</div>
+                          <button onClick={() => handleSell(entry.item)} className="rounded-xl bg-yellow-500 px-3 py-2 text-dark-900 font-black text-sm">Vendre</button>
+                        </div>
                       </div>
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </aside>
+                  ))}
 
-      {/* Toast */}
+                  {!opening && results.length === 0 && (
+                    <div className="text-sm text-gray-500">Ouverture terminee.</div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-500 text-lg">
+                  Choisis une caisse pour lancer l ouverture.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] px-6 py-3 rounded-xl font-semibold text-sm backdrop-blur-xl border shadow-lg animate-slide-in
-          ${toast.type === 'success' ? 'border-emerald-500/50 text-emerald-400 bg-dark-900/90' : 'border-red-500/50 text-red-400 bg-dark-900/90'}`}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] px-6 py-3 rounded-xl font-semibold text-sm backdrop-blur-xl border shadow-lg ${toast.type === 'success' ? 'border-emerald-500/50 text-emerald-400 bg-dark-900/90' : 'border-red-500/50 text-red-400 bg-dark-900/90'}`}>
           {toast.msg}
         </div>
       )}
@@ -265,13 +228,12 @@ export default function CaseOpening({ isOpen, onClose }) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: flex-start;
-          padding-top: 6px;
+          justify-content: center;
           border: 2px solid #555;
-          border-radius: 8px;
-          background: rgba(255,255,255,0.03);
+          border-radius: 12px;
+          background: rgba(255,255,255,0.04);
           flex-shrink: 0;
-          gap: 2px;
+          gap: 4px;
         }
       `}</style>
     </>

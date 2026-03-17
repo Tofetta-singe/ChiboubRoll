@@ -7,7 +7,6 @@ function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
   const megaLevel = activeUpgrades.mega_segments || 0;
   const multiplierLevel = activeUpgrades.multiplier || 0;
   const magnetLevel = activeUpgrades.coin_magnet || 0;
-  const goldenLevel = activeUpgrades.golden_wheel || 0;
   
   // Calculate the multiplier displayed on the wheel
   const coinMultiplier = Math.pow(1.8, multiplierLevel);
@@ -23,37 +22,32 @@ function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
     wheelMultiplier *= powerRollMultiplier;
   }
 
+  // Boosted base economy: 5, 5, 5, 10, 5, 5, 15, 5, 5, 10, 5, 25
   let values = [
-    { base: 2,  color: '#4a3580' },
-    { base: 3,  color: '#5b3d9e' },
-    { base: 3,  color: '#6d45bc' },
-    { base: 5,  color: '#7c4ddb' },
-    { base: 3,  color: '#5540a0' },
-    { base: 2,  color: '#483278' },
-    { base: 8,  color: '#f5a623' },
-    { base: 3,  color: '#6840b5' },
-    { base: 2,  color: '#4c3685' },
-    { base: 5,  color: '#7a4bd8' },
-    { base: 3,  color: '#5a3c9b' },
-    { base: 15, color: '#e6941e' },
+    { base: 5,  color: '#4a3580' },
+    { base: 5,  color: '#5b3d9e' },
+    { base: 5,  color: '#6d45bc' },
+    { base: 10, color: '#7c4ddb' },
+    { base: 5,  color: '#5540a0' },
+    { base: 5,  color: '#483278' },
+    { base: 15, color: '#f5a623' },
+    { base: 5,  color: '#6840b5' },
+    { base: 5,  color: '#4c3685' },
+    { base: 10, color: '#7a4bd8' },
+    { base: 5,  color: '#5a3c9b' },
+    { base: 25, color: '#e6941e' },
   ];
 
-  if (megaLevel >= 1) { values[6].base = 20; values.push({ base: 30, color: '#d4790f' }); }
-  if (megaLevel >= 2) { values.push({ base: 60, color: '#c46a0a' }); }
-  if (megaLevel >= 3) { values.push({ base: 120, color: '#b35b05' }); }
-
-  // Apply Golden Wheel x3
-  const isGolden = wheelIndex < goldenLevel;
-  if (isGolden) {
-    wheelMultiplier *= 3;
-  }
+  if (megaLevel >= 1) { values[6].base = 30; values.push({ base: 40, color: '#d4790f' }); }
+  if (megaLevel >= 2) { values.push({ base: 80, color: '#c46a0a' }); }
+  if (megaLevel >= 3) { values.push({ base: 150, color: '#b35b05' }); }
 
   return values.map(v => {
     const finalValue = Math.floor(v.base * wheelMultiplier);
     return {
       value: finalValue,
       label: formatNumber(finalValue),
-      color: isGolden ? adjustColor(v.color, 40) : v.color,
+      color: v.color,
     };
   });
 }
@@ -177,7 +171,6 @@ export default function WheelGame() {
   const autoSpinRef = useRef(null);
 
   const wheelCount = 1 + (upgrades.extra_wheel || 0);
-  const hasGolden = (upgrades.golden_wheel || 0) > 0;
   const megaLevel = upgrades.mega_segments || 0;
   const spinDuration = Math.max(1200, 3000 - (upgrades.turbo_spin || 0) * 400);
   const hasPowerRoll = (upgrades.power_roll || 0) > 0;
@@ -392,14 +385,13 @@ export default function WheelGame() {
       {/* Wheels */}
       <div className="flex flex-wrap gap-7 justify-center items-center">
         {Array.from({ length: wheelCount }).map((_, i) => {
-          const isGolden = i === 0 && hasGolden;
           return (
             <div key={i} className="relative" style={{ width: 320, height: 320 }}>
               <canvas
                 ref={(el) => { wheelRefs.current[i] = el; }}
                 width={340}
                 height={340}
-                className={`w-full h-full ${isGolden ? 'drop-shadow-[0_0_30px_rgba(255,215,0,0.5)]' : 'drop-shadow-[0_0_20px_rgba(124,58,237,0.3)]'}`}
+                className="w-full h-full drop-shadow-[0_0_20px_rgba(124,58,237,0.3)]"
               />
               {/* Pointer */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl text-yellow-400 drop-shadow-lg z-10">

@@ -12,41 +12,70 @@ const { authMiddleware, generateToken } = require('./middleware/auth');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'chiboub-secret';
-
-// Create HTTP server for Socket.IO
 const server = http.createServer(app);
 
-// ===== LOAD SKINS DATA =====
 const allSkins = require(path.join(__dirname, '..', 'skins.json'));
 
-// ===== RARITY CONFIG =====
 const RARITY_SELL_VALUES = {
-  'Consumer Grade':    5,
-  'Industrial Grade':  15,
-  'Mil-Spec Grade':    40,
-  'Restricted':        120,
-  'Classified':        350,
-  'Covert':            1000,
-  'Extraordinary':     3500,
-  'Contraband':        15000,
+  'Consumer Grade': 5,
+  'Industrial Grade': 15,
+  'Mil-Spec Grade': 40,
+  Restricted: 120,
+  Classified: 350,
+  Covert: 1000,
+  Extraordinary: 3500,
+  Contraband: 15000,
 };
 
 const RARITY_ORDER = [
-  'Consumer Grade', 'Industrial Grade', 'Mil-Spec Grade',
-  'Restricted', 'Classified', 'Covert', 'Extraordinary', 'Contraband'
+  'Consumer Grade',
+  'Industrial Grade',
+  'Mil-Spec Grade',
+  'Restricted',
+  'Classified',
+  'Covert',
+  'Extraordinary',
+  'Contraband',
 ];
 
-// Group skins by rarity
+const WEAR_TIERS = [
+  { short: 'FN', name: 'Factory New', min: 0.0, max: 0.07, multiplier: 2.5 },
+  { short: 'MW', name: 'Minimal Wear', min: 0.07, max: 0.15, multiplier: 1.5 },
+  { short: 'FT', name: 'Field-Tested', min: 0.15, max: 0.38, multiplier: 1.0 },
+  { short: 'WW', name: 'Well-Worn', min: 0.38, max: 0.45, multiplier: 0.8 },
+  { short: 'BS', name: 'Battle-Scarred', min: 0.45, max: 1.01, multiplier: 0.5 },
+];
+
+const FREE_CASE_COOLDOWN_MS = 20_000;
+const LIVE_FEED_LIMIT = 25;
+
 const skinsByRarity = {};
-allSkins.forEach(skin => {
-  const rName = skin.rarity?.name;
-  if (!rName) return;
-  if (!skinsByRarity[rName]) skinsByRarity[rName] = [];
-  skinsByRarity[rName].push(skin);
+allSkins.forEach((skin) => {
+  const rarity = skin.rarity?.name;
+  if (!rarity) return;
+  if (!skinsByRarity[rarity]) skinsByRarity[rarity] = [];
+  skinsByRarity[rarity].push(skin);
 });
 
-// ===== CASE DEFINITIONS =====
+function rarityColor(rarity) {
+  return allSkins.find((skin) => skin.rarity?.name === rarity)?.rarity?.color || '#ffffff';
+}
+
 const CASES = [
+  {
+    id: 'case_gratuite',
+    name: 'Caisse Gratuite',
+    icon: '🎁',
+    price: 0,
+    color: '#60d394',
+    cooldownMs: FREE_CASE_COOLDOWN_MS,
+    drops: [
+      { rarity: 'Consumer Grade', weight: 55 },
+      { rarity: 'Industrial Grade', weight: 28 },
+      { rarity: 'Mil-Spec Grade', weight: 12 },
+      { rarity: 'Restricted', weight: 5 },
+    ],
+  },
   {
     id: 'case_basique',
     name: 'Caisse Basique',
@@ -54,9 +83,10 @@ const CASES = [
     price: 25,
     color: '#b0c3d9',
     drops: [
-      { rarity: 'Consumer Grade',   weight: 70 },
-      { rarity: 'Industrial Grade',  weight: 25 },
-      { rarity: 'Mil-Spec Grade',    weight: 5 },
+      { rarity: 'Consumer Grade', weight: 62 },
+      { rarity: 'Industrial Grade', weight: 25 },
+      { rarity: 'Mil-Spec Grade', weight: 10 },
+      { rarity: 'Restricted', weight: 3 },
     ],
   },
   {
@@ -66,11 +96,11 @@ const CASES = [
     price: 50,
     color: '#5e98d9',
     drops: [
-      { rarity: 'Consumer Grade',   weight: 60 },
-      { rarity: 'Industrial Grade',  weight: 25 },
-      { rarity: 'Mil-Spec Grade',    weight: 10 },
-      { rarity: 'Restricted',        weight: 4 },
-      { rarity: 'Classified',        weight: 1 },
+      { rarity: 'Consumer Grade', weight: 50 },
+      { rarity: 'Industrial Grade', weight: 24 },
+      { rarity: 'Mil-Spec Grade', weight: 16 },
+      { rarity: 'Restricted', weight: 7 },
+      { rarity: 'Classified', weight: 3 },
     ],
   },
   {
@@ -80,59 +110,225 @@ const CASES = [
     price: 200,
     color: '#4b69ff',
     drops: [
-      { rarity: 'Industrial Grade',  weight: 40 },
-      { rarity: 'Mil-Spec Grade',    weight: 30 },
-      { rarity: 'Restricted',        weight: 20 },
-      { rarity: 'Classified',        weight: 8 },
-      { rarity: 'Covert',            weight: 2 },
+      { rarity: 'Industrial Grade', weight: 34 },
+      { rarity: 'Mil-Spec Grade', weight: 28 },
+      { rarity: 'Restricted', weight: 23 },
+      { rarity: 'Classified', weight: 11 },
+      { rarity: 'Covert', weight: 4 },
     ],
   },
   {
     id: 'case_elite',
-    name: 'Caisse Élite',
+    name: 'Caisse Elite',
     icon: '🔥',
     price: 500,
     color: '#8847ff',
     drops: [
-      { rarity: 'Mil-Spec Grade',    weight: 30 },
-      { rarity: 'Restricted',        weight: 35 },
-      { rarity: 'Classified',        weight: 20 },
-      { rarity: 'Covert',            weight: 10 },
-      { rarity: 'Extraordinary',     weight: 5 },
+      { rarity: 'Mil-Spec Grade', weight: 25 },
+      { rarity: 'Restricted', weight: 32 },
+      { rarity: 'Classified', weight: 23 },
+      { rarity: 'Covert', weight: 13 },
+      { rarity: 'Extraordinary', weight: 7 },
     ],
   },
   {
     id: 'case_legendary',
-    name: 'Caisse Légendaire',
+    name: 'Caisse Legendaire',
     icon: '👑',
     price: 1500,
     color: '#d32ce6',
     drops: [
-      { rarity: 'Restricted',        weight: 20 },
-      { rarity: 'Classified',        weight: 35 },
-      { rarity: 'Covert',            weight: 25 },
-      { rarity: 'Extraordinary',     weight: 15 },
-      { rarity: 'Contraband',        weight: 5 },
+      { rarity: 'Restricted', weight: 17 },
+      { rarity: 'Classified', weight: 32 },
+      { rarity: 'Covert', weight: 27 },
+      { rarity: 'Extraordinary', weight: 18 },
+      { rarity: 'Contraband', weight: 6 },
     ],
   },
   {
     id: 'case_gold',
-    name: 'Caisse GOLD',
+    name: 'Caisse Gold',
     icon: '🌟',
     price: 5000,
     color: '#e4ae39',
     drops: [
-      { rarity: 'Classified',        weight: 15 },
-      { rarity: 'Covert',            weight: 35 },
-      { rarity: 'Extraordinary',     weight: 45 },
-      { rarity: 'Contraband',        weight: 5 },
+      { rarity: 'Classified', weight: 14 },
+      { rarity: 'Covert', weight: 33 },
+      { rarity: 'Extraordinary', weight: 45 },
+      { rarity: 'Contraband', weight: 8 },
+    ],
+  },
+  {
+    id: 'case_urban',
+    name: 'Caisse Urbaine',
+    icon: '🏙️',
+    price: 85,
+    color: '#7f8c8d',
+    drops: [
+      { rarity: 'Consumer Grade', weight: 42 },
+      { rarity: 'Industrial Grade', weight: 28 },
+      { rarity: 'Mil-Spec Grade', weight: 18 },
+      { rarity: 'Restricted', weight: 9 },
+      { rarity: 'Classified', weight: 3 },
+    ],
+  },
+  {
+    id: 'case_frost',
+    name: 'Caisse Frostbite',
+    icon: '❄️',
+    price: 320,
+    color: '#7dd3fc',
+    drops: [
+      { rarity: 'Industrial Grade', weight: 24 },
+      { rarity: 'Mil-Spec Grade', weight: 30 },
+      { rarity: 'Restricted', weight: 24 },
+      { rarity: 'Classified', weight: 15 },
+      { rarity: 'Covert', weight: 7 },
+    ],
+  },
+  {
+    id: 'case_inferno',
+    name: 'Caisse Inferno',
+    icon: '🔥',
+    price: 750,
+    color: '#ff6b35',
+    drops: [
+      { rarity: 'Mil-Spec Grade', weight: 18 },
+      { rarity: 'Restricted', weight: 31 },
+      { rarity: 'Classified', weight: 25 },
+      { rarity: 'Covert', weight: 18 },
+      { rarity: 'Extraordinary', weight: 8 },
+    ],
+  },
+  {
+    id: 'case_sakura',
+    name: 'Caisse Sakura',
+    icon: '🌸',
+    price: 980,
+    color: '#ff8fab',
+    drops: [
+      { rarity: 'Restricted', weight: 24 },
+      { rarity: 'Classified', weight: 31 },
+      { rarity: 'Covert', weight: 24 },
+      { rarity: 'Extraordinary', weight: 15 },
+      { rarity: 'Contraband', weight: 6 },
+    ],
+  },
+  {
+    id: 'case_void',
+    name: 'Caisse Void',
+    icon: '🪐',
+    price: 2600,
+    color: '#8b5cf6',
+    drops: [
+      { rarity: 'Classified', weight: 24 },
+      { rarity: 'Covert', weight: 34 },
+      { rarity: 'Extraordinary', weight: 31 },
+      { rarity: 'Contraband', weight: 11 },
     ],
   },
 ];
 
-// Helper: pick a random skin from a case
+const BATTLEPASS_TIERS = [
+  { id: 'bp_01', spinsRequired: 5, reward: { type: 'coins', amount: 100 } },
+  { id: 'bp_02', spinsRequired: 12, reward: { type: 'skin', rarity: 'Mil-Spec Grade', label: 'Drop Mil-Spec' } },
+  { id: 'bp_03', spinsRequired: 25, reward: { type: 'coins', amount: 350 } },
+  { id: 'bp_04', spinsRequired: 40, reward: { type: 'skin', rarity: 'Restricted', label: 'Drop Restricted' } },
+  { id: 'bp_05', spinsRequired: 60, reward: { type: 'coins', amount: 900 } },
+  { id: 'bp_06', spinsRequired: 85, reward: { type: 'skin', rarity: 'Classified', label: 'Drop Classified' } },
+  { id: 'bp_07', spinsRequired: 120, reward: { type: 'coins', amount: 2200 } },
+  { id: 'bp_08', spinsRequired: 160, reward: { type: 'skin', rarity: 'Covert', label: 'Drop Covert' } },
+];
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const DISCORD_REDIRECT_URI =
+  process.env.DISCORD_REDIRECT_URI || 'https://chiboubroll.onrender.com/api/auth/callback';
+const CLIENT_URL = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app';
+
+app.use(cors({ origin: CLIENT_URL, credentials: true }));
+app.use(express.json());
+
+const spinCooldowns = new Map();
+const liveDrops = [];
+
+const UPGRADES = {
+  extra_wheel: { baseCost: 150, costScale: 2.8, maxLevel: 3 },
+  turbo_spin: { baseCost: 100, costScale: 1.5, maxLevel: 3 },
+  multiplier: { baseCost: 250, costScale: 1.35, maxLevel: 3 },
+  lucky: { baseCost: 500, costScale: 1.8, maxLevel: 3 },
+  auto_spin: { baseCost: 1000, costScale: 2.2, maxLevel: 3 },
+  mega_segments: { baseCost: 1500, costScale: 2.5, maxLevel: 3 },
+  coin_magnet: { baseCost: 200, costScale: 1.25, maxLevel: 3 },
+  power_roll: { baseCost: 2000, costScale: 2.5, maxLevel: 3 },
+  power_roll_boost: { baseCost: 3000, costScale: 2.0, maxLevel: 3 },
+  power_roll_freq: { baseCost: 5000, costScale: 1.8, maxLevel: 3 },
+  diamond_rain: { baseCost: 10000, costScale: 2.2, maxLevel: 3 },
+  combo_streak: { baseCost: 1200, costScale: 1.4, maxLevel: 3 },
+  jackpot_chance: { baseCost: 25000, costScale: 3.5, maxLevel: 3 },
+};
+
+function getUpgradeCost(upgradeId, currentLevel) {
+  const upgrade = UPGRADES[upgradeId];
+  if (!upgrade) return Infinity;
+  return Math.floor(upgrade.baseCost * Math.pow(upgrade.costScale, currentLevel));
+}
+
+function getWearData(floatValue) {
+  const wear = WEAR_TIERS.find((tier) => floatValue >= tier.min && floatValue < tier.max) || WEAR_TIERS[2];
+  return { floatValue: Number(floatValue.toFixed(4)), ...wear };
+}
+
+function buildInventoryItemFromRoll(roll) {
+  const wear = getWearData(Math.random());
+  const baseValue = RARITY_SELL_VALUES[roll.rarity] || 5;
+  const sellValue = Math.max(1, Math.round(baseValue * wear.multiplier));
+
+  return {
+    skin_id: roll.skin.id,
+    skin_name: roll.skin.name,
+    skin_image: roll.skin.image || '',
+    rarity: roll.rarity,
+    rarity_color: roll.skin.rarity?.color || rarityColor(roll.rarity),
+    sell_value: sellValue,
+    float_value: wear.floatValue,
+    wear_name: wear.name,
+    wear_short: wear.short,
+  };
+}
+
+function isRareRarity(rarity) {
+  return RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf('Classified');
+}
+
+function createLiveDrop(payload) {
+  liveDrops.unshift(payload);
+  liveDrops.splice(LIVE_FEED_LIMIT);
+  io.emit('global:drop', payload);
+}
+
+function maybeEmitRareDrop(user, item, caseName, source = 'case') {
+  if (!isRareRarity(item.rarity)) return;
+  createLiveDrop({
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    source,
+    userId: user.id,
+    username: user.username,
+    avatar: user.avatar,
+    skin: item.skin_name,
+    skinImage: item.skin_image,
+    rarity: item.rarity,
+    rarityColor: item.rarity_color,
+    caseName,
+    wearShort: item.wear_short,
+    floatValue: item.float_value,
+    sellValue: item.sell_value,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 function rollSkinFromCase(caseData) {
-  const totalWeight = caseData.drops.reduce((sum, d) => sum + d.weight, 0);
+  const totalWeight = caseData.drops.reduce((sum, drop) => sum + drop.weight, 0);
   let roll = Math.random() * totalWeight;
   let chosenRarity = caseData.drops[caseData.drops.length - 1].rarity;
 
@@ -144,83 +340,102 @@ function rollSkinFromCase(caseData) {
     }
   }
 
-  const pool = skinsByRarity[chosenRarity];
-  if (!pool || pool.length === 0) {
-    // Fallback to Mil-Spec if somehow empty
-    const fallback = skinsByRarity['Mil-Spec Grade'] || allSkins;
-    const skin = fallback[Math.floor(Math.random() * fallback.length)];
-    return { skin, rarity: skin.rarity?.name || 'Mil-Spec Grade' };
-  }
-
+  const pool = skinsByRarity[chosenRarity] || skinsByRarity['Mil-Spec Grade'] || allSkins;
   const skin = pool[Math.floor(Math.random() * pool.length)];
   return { skin, rarity: chosenRarity };
 }
 
-// Helper: generate a strip of 40 skins for animation
-function generateStrip(caseData, winningRoll) {
+function generateStrip(caseData, winningItem) {
   const strip = [];
   for (let i = 0; i < 40; i++) {
     if (i === 35) {
       strip.push({
-        skin_name: winningRoll.skin.name,
-        skin_image: winningRoll.skin.image || '',
-        rarity: winningRoll.rarity,
-        rarity_color: winningRoll.skin.rarity?.color || '#fff'
+        skin_name: winningItem.skin_name,
+        skin_image: winningItem.skin_image,
+        rarity: winningItem.rarity,
+        rarity_color: winningItem.rarity_color,
+        float_value: winningItem.float_value,
+        wear_short: winningItem.wear_short,
       });
-    } else {
-      const fakeRoll = rollSkinFromCase(caseData);
-      strip.push({
-        skin_name: fakeRoll.skin.name,
-        skin_image: fakeRoll.skin.image || '',
-        rarity: fakeRoll.rarity,
-        rarity_color: fakeRoll.skin.rarity?.color || '#fff'
-      });
+      continue;
     }
+    const fakeItem = buildInventoryItemFromRoll(rollSkinFromCase(caseData));
+    strip.push({
+      skin_name: fakeItem.skin_name,
+      skin_image: fakeItem.skin_image,
+      rarity: fakeItem.rarity,
+      rarity_color: fakeItem.rarity_color,
+      float_value: fakeItem.float_value,
+      wear_short: fakeItem.wear_short,
+    });
   }
   return strip;
 }
 
-// ===== CONFIG =====
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'https://chiboubroll.onrender.com/api/auth/callback';
-const CLIENT_URL = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app';
-
-// ===== MIDDLEWARE =====
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
-app.use(express.json());
-
-// ===== UPGRADE DEFINITIONS (server-side validation) =====
-const UPGRADES = {
-  // ---- Original/Core upgrades (NERFED: max 3) ----
-  extra_wheel:      { baseCost: 150,   costScale: 2.8,  maxLevel: 3 },
-  turbo_spin:       { baseCost: 100,   costScale: 1.5,  maxLevel: 3 },
-  multiplier:       { baseCost: 250,   costScale: 1.35, maxLevel: 3 },
-  lucky:            { baseCost: 500,   costScale: 1.8,  maxLevel: 3 },
-  auto_spin:        { baseCost: 1000,  costScale: 2.2,  maxLevel: 3 },
-  golden_wheel:     { baseCost: 5000,  costScale: 5.0,  maxLevel: 2 },
-  mega_segments:    { baseCost: 1500,  costScale: 2.5,  maxLevel: 3 },
-  coin_magnet:      { baseCost: 200,   costScale: 1.25, maxLevel: 3 },
-  // ---- Power Roll & Special (NERFED: max 3) ----
-  power_roll:       { baseCost: 2000,  costScale: 2.5,  maxLevel: 3 },
-  power_roll_boost: { baseCost: 3000,  costScale: 2.0,  maxLevel: 3 },
-  power_roll_freq:  { baseCost: 5000,  costScale: 1.8,  maxLevel: 3 },
-  diamond_rain:     { baseCost: 10000, costScale: 2.2,  maxLevel: 3 },
-  combo_streak:     { baseCost: 1200,  costScale: 1.4,  maxLevel: 3 },
-  jackpot_chance:   { baseCost: 25000, costScale: 3.5,  maxLevel: 3 },
-};
-
-function getUpgradeCost(upgradeId, currentLevel) {
-  const upg = UPGRADES[upgradeId];
-  if (!upg) return Infinity;
-  return Math.floor(upg.baseCost * Math.pow(upg.costScale, currentLevel));
+function getServerSegments(wheelIndex, upgrades) {
+  const megaLevel = upgrades.mega_segments || 0;
+  const values = [5, 5, 5, 10, 5, 5, 15, 5, 5, 10, 5, 25];
+  if (megaLevel >= 1) {
+    values[6] = 30;
+    values.push(40);
+  }
+  if (megaLevel >= 2) values.push(80);
+  if (megaLevel >= 3) values.push(150);
+  return values;
 }
 
-// =========================================
-//  AUTH ROUTES — Discord OAuth2
-// =========================================
+function createInventoryRecord(userId, item) {
+  const id = db.addInventoryItem(userId, item);
+  return { id, ...item };
+}
 
-/** Step 1: Redirect user to Discord OAuth2 */
+function rewardBattlepass(userId, tier) {
+  const user = db.getUser(userId);
+  if (!user) throw new Error('Utilisateur non trouve');
+
+  if (tier.reward.type === 'coins') {
+    const updatedUser = db.setCoins(userId, user.coins + tier.reward.amount);
+    return {
+      rewardType: 'coins',
+      coinsGranted: tier.reward.amount,
+      user: updatedUser,
+    };
+  }
+
+  const pool = skinsByRarity[tier.reward.rarity] || allSkins;
+  const item = buildInventoryItemFromRoll({
+    skin: pool[Math.floor(Math.random() * pool.length)],
+    rarity: tier.reward.rarity,
+  });
+  const record = createInventoryRecord(userId, item);
+  maybeEmitRareDrop(user, record, `Battlepass ${tier.id.toUpperCase()}`, 'battlepass');
+  return {
+    rewardType: 'skin',
+    item: record,
+    user: db.getUser(userId),
+  };
+}
+
+function serializeBattlepass(userId) {
+  const user = db.getUser(userId);
+  const claimed = new Set(db.getClaimedBattlepassTiers(userId));
+  return {
+    totalSpins: user?.total_spins || 0,
+    claimedTierIds: [...claimed],
+    tiers: BATTLEPASS_TIERS.map((tier) => ({
+      ...tier,
+      unlocked: (user?.total_spins || 0) >= tier.spinsRequired,
+      claimed: claimed.has(tier.id),
+    })),
+  };
+}
+
+function getUserPublic(userId) {
+  const user = db.getUser(userId);
+  if (!user) return null;
+  return { id: user.id, username: user.username, avatar: user.avatar };
+}
+
 app.get('/api/auth/discord', (req, res) => {
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
@@ -231,15 +446,11 @@ app.get('/api/auth/discord', (req, res) => {
   res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
 });
 
-/** Step 2: Discord callback — exchange code for token, fetch user, upsert DB */
 app.get('/api/auth/callback', async (req, res) => {
   const { code } = req.query;
-  if (!code) {
-    return res.status(400).json({ error: 'Code manquant' });
-  }
+  if (!code) return res.status(400).json({ error: 'Code manquant' });
 
   try {
-    // Exchange code for access token
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -255,412 +466,277 @@ app.get('/api/auth/callback', async (req, res) => {
     const tokenData = await tokenRes.json();
     if (!tokenData.access_token) {
       console.error('Discord token error:', tokenData);
-      return res.status(400).json({ error: 'Échec d\'authentification Discord' });
+      return res.status(400).json({ error: 'Echec authentification Discord' });
     }
 
-    // Fetch user profile from Discord
     const userRes = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
-
     const discordUser = await userRes.json();
-    if (!discordUser.id) {
-      return res.status(400).json({ error: 'Impossible de récupérer le profil Discord' });
-    }
+    if (!discordUser.id) return res.status(400).json({ error: 'Profil Discord indisponible' });
 
-    // Build avatar URL
     const avatarUrl = discordUser.avatar
       ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png?size=128`
-      : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator || '0') % 5}.png`;
+      : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator || '0', 10) % 5}.png`;
 
-    // Upsert user in database
     db.upsertUser(discordUser.id, discordUser.username, avatarUrl);
-
-    // Generate JWT
-    const jwt = generateToken(discordUser.id);
-
-    // Redirect to frontend with token
-    res.redirect(`${CLIENT_URL}/?token=${jwt}`);
-
-  } catch (err) {
-    console.error('OAuth2 error:', err);
-    res.status(500).json({ error: 'Erreur serveur lors de l\'authentification' });
+    const token = generateToken(discordUser.id);
+    res.redirect(`${CLIENT_URL}/?token=${token}`);
+  } catch (error) {
+    console.error('OAuth2 error:', error);
+    res.status(500).json({ error: 'Erreur serveur lors de l authentification' });
   }
 });
 
-// =========================================
-//  API ROUTES (require auth)
-// =========================================
-
-/** GET /api/me — Get current user profile + upgrades */
 app.get('/api/me', authMiddleware, (req, res) => {
   const user = db.getUser(req.userId);
-  if (!user) {
-    return res.status(404).json({ error: 'Utilisateur non trouvé' });
-  }
-  const upgrades = db.getUpgrades(req.userId);
-  res.json({ user, upgrades });
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
+  res.json({ user, upgrades: db.getUpgrades(req.userId) });
 });
 
-/** POST /api/spin — Process a spin result, server validates and awards coins */
 app.post('/api/spin', authMiddleware, (req, res) => {
-  const user = db.getUser(req.userId);
-  if (!user) {
-    return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  const now = Date.now();
+  const lastSpin = spinCooldowns.get(req.userId) || 0;
+  if (now - lastSpin < 1500) {
+    return res.status(429).json({ error: 'Trop rapide, attends la fin de l animation.' });
   }
+  spinCooldowns.set(req.userId, now);
+
+  const user = db.getUser(req.userId);
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
 
   const upgrades = db.getUpgrades(req.userId);
-
-  // ===== Calculate upgrade effects =====
   const multiplierLevel = upgrades.multiplier || 0;
   const coinMultiplier = Math.pow(1.8, multiplierLevel);
-  const magnetLevel = upgrades.coin_magnet || 0;
-  const magnetBonus = 1 + magnetLevel * 0.10;
+  const magnetBonus = 1 + (upgrades.coin_magnet || 0) * 0.1;
   const wheelCount = 1 + (upgrades.extra_wheel || 0);
   const luckyLevel = upgrades.lucky || 0;
-  const hasGolden = (upgrades.golden_wheel || 0) > 0;
-  const megaLevel = upgrades.mega_segments || 0;
-
-  // ===== Power Roll check =====
   const powerRollLevel = upgrades.power_roll || 0;
   const powerBoostLevel = upgrades.power_roll_boost || 0;
   const powerFreqLevel = upgrades.power_roll_freq || 0;
   const powerRollThreshold = Math.max(10, 25 - powerFreqLevel * 3);
   const powerRollMultiplier = 5 + powerBoostLevel * 2;
-  // Power Roll triggers when threshold is reached AND user has the upgrade
   const spinsBeforePower = user.spins_since_power || 0;
-  const isPowerRoll = powerRollLevel > 0 && spinsBeforePower >= (powerRollThreshold - 1);
+  const isPowerRoll = powerRollLevel > 0 && spinsBeforePower >= powerRollThreshold - 1;
 
-  // ===== Combo Streak =====
   const comboLevel = upgrades.combo_streak || 0;
-  const lastSpinTime = user.last_spin_at ? new Date(user.last_spin_at + 'Z').getTime() : 0;
-  const now = Date.now();
-  const streakTimeout = 30000; // 30 seconds
+  const lastSpinTime = user.last_spin_at ? new Date(`${user.last_spin_at}Z`).getTime() : 0;
   let currentStreak = user.spin_streak || 0;
-  if (now - lastSpinTime > streakTimeout) {
-    currentStreak = 0; // Reset streak if inactive too long
-  }
+  if (Date.now() - lastSpinTime > 30_000) currentStreak = 0;
   const streakBonus = comboLevel > 0 ? 1 + currentStreak * 0.05 * comboLevel : 1;
 
-  // ===== Diamond Rain =====
-  const diamondLevel = upgrades.diamond_rain || 0;
-  const diamondProc = diamondLevel > 0 && Math.random() < diamondLevel * 0.05;
+  const diamondProc = (upgrades.diamond_rain || 0) > 0 && Math.random() < (upgrades.diamond_rain || 0) * 0.05;
+  const jackpotProc = (upgrades.jackpot_chance || 0) > 0 && Math.random() < (upgrades.jackpot_chance || 0) * 0.02;
 
-  // ===== Jackpot =====
-  const jackpotLevel = upgrades.jackpot_chance || 0;
-  const jackpotProc = jackpotLevel > 0 && Math.random() < jackpotLevel * 0.02;
-
-  // ===== Server-side spin calculation =====
   let totalWin = 0;
   const results = [];
 
-  const goldenLevel = upgrades.golden_wheel || 0;
-
-  for (let w = 0; w < wheelCount; w++) {
-    const segments = getServerSegments(w, upgrades);
-    const isGolden = w < goldenLevel;
-    
-    // Lucky selection
+  for (let wheelIndex = 0; wheelIndex < wheelCount; wheelIndex++) {
+    const segments = getServerSegments(wheelIndex, upgrades);
     let winIndex;
+
     if (luckyLevel > 0 && Math.random() < luckyLevel * 0.12) {
-      const sorted = segments.map((s, i) => ({ val: s, i })).sort((a, b) => b.val - a.val);
+      const sorted = segments.map((value, index) => ({ value, index })).sort((a, b) => b.value - a.value);
       const topThird = sorted.slice(0, Math.ceil(sorted.length / 3));
-      winIndex = topThird[Math.floor(Math.random() * topThird.length)].i;
+      winIndex = topThird[Math.floor(Math.random() * topThird.length)].index;
     } else {
       winIndex = Math.floor(Math.random() * segments.length);
     }
 
-    const baseValue = segments[winIndex];
-    let earned = Math.floor(baseValue * coinMultiplier * magnetBonus * streakBonus);
-
-    // Power Roll multiplier
-    if (isPowerRoll) {
-      earned = Math.floor(earned * powerRollMultiplier);
-    }
-
+    let earned = Math.floor(segments[winIndex] * coinMultiplier * magnetBonus * streakBonus);
+    if (isPowerRoll) earned = Math.floor(earned * powerRollMultiplier);
     totalWin += earned;
-    results.push({ wheelIndex: w, segmentIndex: winIndex, value: earned, isGolden });
+    results.push({ wheelIndex, segmentIndex: winIndex, value: earned });
   }
 
-  // Apply Diamond Rain (double total)
-  if (diamondProc) {
-    totalWin = totalWin * 2;
-  }
+  if (diamondProc) totalWin *= 2;
+  if (jackpotProc) totalWin *= 10;
 
-  // Apply Jackpot (x10 total)
-  if (jackpotProc) {
-    totalWin = totalWin * 10;
-  }
-
-  // ===== Update database =====
-  const updatedUser = db.addCoins(req.userId, totalWin);
-
-  // Reset power counter if power roll triggered
-  if (isPowerRoll) {
-    db.resetPowerCounter(req.userId);
-  }
-
-  // Update streak
+  db.addCoins(req.userId, totalWin);
+  if (isPowerRoll) db.resetPowerCounter(req.userId);
   db.updateStreak(req.userId, currentStreak + 1);
 
-  // Fetch fresh user for accurate data
   const freshUser = db.getUser(req.userId);
-
   res.json({
     results,
     totalWin,
     coins: freshUser.coins,
     totalEarned: freshUser.total_earned,
     totalSpins: freshUser.total_spins,
-    // Special event flags
     isPowerRoll,
     powerRollMultiplier: isPowerRoll ? powerRollMultiplier : null,
     isDiamondRain: diamondProc,
     isJackpot: jackpotProc,
     comboStreak: currentStreak + 1,
-    spinsSincePower: isPowerRoll ? 0 : (freshUser.spins_since_power || 0),
+    spinsSincePower: isPowerRoll ? 0 : freshUser.spins_since_power || 0,
     powerRollThreshold,
   });
 });
 
-/** POST /api/upgrade — Buy an upgrade */
 app.post('/api/upgrade', authMiddleware, (req, res) => {
   const { upgradeId } = req.body;
-
-  if (!upgradeId || !UPGRADES[upgradeId]) {
-    return res.status(400).json({ error: 'Upgrade invalide' });
-  }
+  if (!upgradeId || !UPGRADES[upgradeId]) return res.status(400).json({ error: 'Upgrade invalide' });
 
   const user = db.getUser(req.userId);
-  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
 
   const upgrades = db.getUpgrades(req.userId);
   const currentLevel = upgrades[upgradeId] || 0;
-  const upg = UPGRADES[upgradeId];
-
-  if (currentLevel >= upg.maxLevel) {
-    return res.status(400).json({ error: 'Upgrade déjà au max!' });
-  }
+  const upgrade = UPGRADES[upgradeId];
+  if (currentLevel >= upgrade.maxLevel) return res.status(400).json({ error: 'Upgrade deja au max' });
 
   const cost = getUpgradeCost(upgradeId, currentLevel);
+  if (user.coins < cost) return res.status(400).json({ error: 'Pas assez de Chiboub Coins' });
 
-  if (user.coins < cost) {
-    return res.status(400).json({ error: 'Pas assez de Chiboub Coins!' });
-  }
-
-  // Deduct coins and set upgrade
   db.setCoins(req.userId, user.coins - cost);
   db.setUpgrade(req.userId, upgradeId, currentLevel + 1);
-
-  const updatedUser = db.getUser(req.userId);
-  const updatedUpgrades = db.getUpgrades(req.userId);
-
-  res.json({ user: updatedUser, upgrades: updatedUpgrades });
+  res.json({ user: db.getUser(req.userId), upgrades: db.getUpgrades(req.userId) });
 });
 
-/** GET /api/leaderboard — Top 10 players */
 app.get('/api/leaderboard', (req, res) => {
-  const leaderboard = db.getLeaderboard();
-  res.json({ leaderboard });
+  res.json({ leaderboard: db.getLeaderboard() });
 });
 
-// =========================================
-//  CASE OPENING ROUTES
-// =========================================
-
-/** GET /api/cases — List all available cases */
 app.get('/api/cases', (req, res) => {
-  const casesForClient = CASES.map(c => ({
-    id: c.id,
-    name: c.name,
-    icon: c.icon,
-    price: c.price,
-    color: c.color,
-    drops: c.drops.map(d => ({
-      rarity: d.rarity,
-      chance: d.weight,
-      sellValue: RARITY_SELL_VALUES[d.rarity] || 0,
-      color: allSkins.find(s => s.rarity?.name === d.rarity)?.rarity?.color || '#fff',
-    })),
-  }));
-  res.json({ cases: casesForClient });
-});
-
-/** POST /api/cases/open — Open a case (server-side RNG) */
-app.post('/api/cases/open', authMiddleware, (req, res) => {
-  const { caseId } = req.body;
-
-  const caseData = CASES.find(c => c.id === caseId);
-  if (!caseData) return res.status(400).json({ error: 'Caisse invalide' });
-
-  const user = db.getUser(req.userId);
-  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-
-  if (user.coins < caseData.price) {
-    return res.status(400).json({ error: 'Pas assez de Chiboub Coins!' });
-  }
-
-  // Deduct coins
-  db.setCoins(req.userId, user.coins - caseData.price);
-
-  // Roll a skin
-  const { skin, rarity } = rollSkinFromCase(caseData);
-  const sellValue = RARITY_SELL_VALUES[rarity] || 5;
-
-  // Generate animation strip
-  const strip = generateStrip(caseData, { skin, rarity });
-
-  // Add to inventory
-  const itemId = db.addInventoryItem(
-    req.userId,
-    skin.id,
-    skin.name,
-    skin.image || '',
-    rarity,
-    sellValue
-  );
-
-  const freshUser = db.getUser(req.userId);
-
   res.json({
-    item: {
-      id: itemId,
-      skin_id: skin.id,
-      skin_name: skin.name,
-      skin_image: skin.image || '',
-      rarity,
-      rarity_color: skin.rarity?.color || '#fff',
-      sell_value: sellValue,
-    },
-    strip,
-    coins: freshUser.coins,
+    cases: CASES.map((caseData) => ({
+      id: caseData.id,
+      name: caseData.name,
+      icon: caseData.icon,
+      price: caseData.price,
+      color: caseData.color,
+      isFree: caseData.price === 0,
+      maxOpenAmount: caseData.price === 0 ? 1 : 5,
+      cooldownMs: caseData.cooldownMs || null,
+      drops: caseData.drops.map((drop) => ({
+        rarity: drop.rarity,
+        sellValue: RARITY_SELL_VALUES[drop.rarity] || 0,
+        color: rarityColor(drop.rarity),
+      })),
+    })),
   });
 });
 
-/** GET /api/inventory — Get user inventory */
-app.get('/api/inventory', authMiddleware, (req, res) => {
-  const items = db.getInventory(req.userId);
-  // Enrich with rarity color
-  const enriched = items.map(item => ({
-    ...item,
-    rarity_color: allSkins.find(s => s.rarity?.name === item.rarity)?.rarity?.color || '#fff',
-  }));
-  res.json({ inventory: enriched });
+app.post('/api/cases/open', authMiddleware, (req, res) => {
+  const { caseId, amount: rawAmount } = req.body;
+  const amount = Math.max(1, Math.min(5, Number(rawAmount) || 1));
+  const caseData = CASES.find((item) => item.id === caseId);
+  if (!caseData) return res.status(400).json({ error: 'Caisse invalide' });
+  if (caseData.price === 0 && amount > 1) return res.status(400).json({ error: 'La caisse gratuite s ouvre une par une.' });
+
+  const user = db.getUser(req.userId);
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
+
+  if (caseData.price === 0) {
+    const lastOpened = user.free_case_last_opened ? new Date(`${user.free_case_last_opened}Z`).getTime() : 0;
+    const remainingMs = FREE_CASE_COOLDOWN_MS - (Date.now() - lastOpened);
+    if (remainingMs > 0) {
+      return res.status(429).json({ error: `Caisse gratuite disponible dans ${Math.ceil(remainingMs / 1000)}s.` });
+    }
+    db.markFreeCaseOpened(req.userId);
+  }
+
+  const totalCost = caseData.price * amount;
+  if (user.coins < totalCost) return res.status(400).json({ error: 'Pas assez de Chiboub Coins' });
+  if (totalCost > 0) db.setCoins(req.userId, user.coins - totalCost);
+
+  const opener = db.getUser(req.userId);
+  const results = [];
+  for (let index = 0; index < amount; index++) {
+    const item = createInventoryRecord(req.userId, buildInventoryItemFromRoll(rollSkinFromCase(caseData)));
+    maybeEmitRareDrop(opener, item, caseData.name, 'case');
+    results.push({ item, strip: generateStrip(caseData, item) });
+  }
+
+  res.json({
+    items: results,
+    amount,
+    coins: db.getUser(req.userId).coins,
+  });
 });
 
-/** POST /api/inventory/sell — Sell a skin from inventory */
+app.get('/api/inventory', authMiddleware, (req, res) => {
+  const inventory = db.getInventory(req.userId).map((item) => ({
+    ...item,
+    rarity_color: rarityColor(item.rarity),
+  }));
+  res.json({ inventory });
+});
+
 app.post('/api/inventory/sell', authMiddleware, (req, res) => {
   const { itemId } = req.body;
   if (!itemId) return res.status(400).json({ error: 'itemId manquant' });
 
   const item = db.getInventoryItem(itemId, req.userId);
-  if (!item) return res.status(404).json({ error: 'Skin non trouvé dans l\'inventaire' });
+  if (!item) return res.status(404).json({ error: 'Skin non trouve dans inventaire' });
 
   const user = db.getUser(req.userId);
-  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
 
-  // Delete item and add coins
   db.deleteInventoryItem(itemId, req.userId);
-  db.setCoins(req.userId, user.coins + item.sell_value);
-
-  const freshUser = db.getUser(req.userId);
-  res.json({ coins: freshUser.coins, soldValue: item.sell_value });
+  const updatedUser = db.setCoins(req.userId, user.coins + item.sell_value);
+  res.json({ coins: updatedUser.coins, soldValue: item.sell_value });
 });
 
-// =========================================
-//  CASE BATTLE ROUTE
-// =========================================
-
-/** POST /api/case-battle/start — 1v1 case battle vs bot */
 app.post('/api/case-battle/start', authMiddleware, (req, res) => {
   const { caseId } = req.body;
-
-  const caseData = CASES.find(c => c.id === caseId);
+  const caseData = CASES.find((item) => item.id === caseId);
   if (!caseData) return res.status(400).json({ error: 'Caisse invalide' });
 
   const user = db.getUser(req.userId);
-  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
+  if (user.coins < caseData.price) return res.status(400).json({ error: 'Pas assez de Chiboub Coins' });
 
-  if (user.coins < caseData.price) {
-    return res.status(400).json({ error: 'Pas assez de Chiboub Coins!' });
-  }
-
-  // Deduct coins for the battle
   db.setCoins(req.userId, user.coins - caseData.price);
-
-  // Roll for player and bot
-  const playerRoll = rollSkinFromCase(caseData);
-  const botRoll = rollSkinFromCase(caseData);
-
-  const playerValue = RARITY_SELL_VALUES[playerRoll.rarity] || 0;
-  const botValue = RARITY_SELL_VALUES[botRoll.rarity] || 0;
-
-  // Determine winner (higher sell value wins, tie = player wins)
-  const playerWins = playerValue >= botValue;
-
-  let resultItems = [];
+  const playerSkin = buildInventoryItemFromRoll(rollSkinFromCase(caseData));
+  const botSkin = buildInventoryItemFromRoll(rollSkinFromCase(caseData));
+  const playerWins = playerSkin.sell_value >= botSkin.sell_value;
 
   if (playerWins) {
-    // Player wins: gets both skins
-    const id1 = db.addInventoryItem(req.userId, playerRoll.skin.id, playerRoll.skin.name, playerRoll.skin.image || '', playerRoll.rarity, playerValue);
-    const id2 = db.addInventoryItem(req.userId, botRoll.skin.id, botRoll.skin.name, botRoll.skin.image || '', botRoll.rarity, botValue);
-    resultItems = [id1, id2];
+    createInventoryRecord(req.userId, playerSkin);
+    createInventoryRecord(req.userId, botSkin);
+    maybeEmitRareDrop(user, playerSkin, caseData.name, 'battle');
+    maybeEmitRareDrop(user, botSkin, caseData.name, 'battle');
   }
-  // If player loses, they get nothing (coins already deducted)
-
-  const freshUser = db.getUser(req.userId);
 
   res.json({
-    playerSkin: {
-      skin_name: playerRoll.skin.name,
-      skin_image: playerRoll.skin.image || '',
-      rarity: playerRoll.rarity,
-      rarity_color: playerRoll.skin.rarity?.color || '#fff',
-      sell_value: playerValue,
-    },
-    botSkin: {
-      skin_name: botRoll.skin.name,
-      skin_image: botRoll.skin.image || '',
-      rarity: botRoll.rarity,
-      rarity_color: botRoll.skin.rarity?.color || '#fff',
-      sell_value: botValue,
-    },
+    playerSkin,
+    botSkin,
     playerWins,
-    coins: freshUser.coins,
+    coins: db.getUser(req.userId).coins,
   });
 });
 
-// ===== SERVER SEGMENT VALUES (avg ~5 per spin) =====
-function getServerSegments(wheelIndex, upgrades) {
-  const megaLevel = upgrades.mega_segments || 0;
-  const goldenLevel = upgrades.golden_wheel || 0;
-  
-  let values = [2, 3, 3, 5, 3, 2, 8, 3, 2, 5, 3, 15];
-
-  if (megaLevel >= 1) { values[6] = 20; values.push(30); }
-  if (megaLevel >= 2) { values.push(60); }
-  if (megaLevel >= 3) { values.push(120); }
-
-  // If this wheel index is within the golden range
-  if (wheelIndex < goldenLevel) {
-    values = values.map(v => v * 3);
-  }
-
-  return values;
-}
-
-// =========================================
-//  SOCKET.IO — REAL-TIME CASE BATTLE
-// =========================================
-const CLIENT_URL_FOR_IO = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app';
-const io = new Server(server, {
-  cors: { origin: CLIENT_URL_FOR_IO, methods: ['GET', 'POST'], credentials: true },
+app.get('/api/battlepass', authMiddleware, (req, res) => {
+  res.json(serializeBattlepass(req.userId));
 });
 
-// In-memory rooms store
-const battleRooms = new Map();
+app.post('/api/battlepass/claim', authMiddleware, (req, res) => {
+  const { tierId } = req.body;
+  const tier = BATTLEPASS_TIERS.find((entry) => entry.id === tierId);
+  if (!tier) return res.status(400).json({ error: 'Palier invalide' });
 
-// Auth middleware for socket.io
+  const state = serializeBattlepass(req.userId);
+  const target = state.tiers.find((entry) => entry.id === tierId);
+  if (!target.unlocked) return res.status(400).json({ error: 'Palier non debloque' });
+  if (target.claimed) return res.status(400).json({ error: 'Palier deja recupere' });
+
+  db.addBattlepassClaim(req.userId, tierId);
+  res.json({
+    battlepass: serializeBattlepass(req.userId),
+    reward: rewardBattlepass(req.userId, tier),
+  });
+});
+
+const io = new Server(server, {
+  cors: { origin: CLIENT_URL, methods: ['GET', 'POST'], credentials: true },
+});
+
+const battleRooms = new Map();
+const userSockets = new Map();
+const tradeInvites = new Map();
+const tradeRooms = new Map();
+
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('Authentication required'));
@@ -676,162 +752,158 @@ io.use((socket, next) => {
   }
 });
 
-io.on('connection', (socket) => {
-  console.log(`⚔️ Socket connected: ${socket.username} (${socket.userId})`);
+function sanitizeRoom(room) {
+  return {
+    id: room.id,
+    totalPrice: room.totalPrice,
+    rounds: room.rounds,
+    creator: room.creator ? { id: room.creator.id, username: room.creator.username, avatar: room.creator.avatar } : null,
+    joiner: room.joiner ? { id: room.joiner.id, username: room.joiner.username, avatar: room.joiner.avatar } : null,
+    status: room.status,
+  };
+}
 
-  // Create a battle room
+function getOpenRooms() {
+  const rooms = [];
+  for (const room of battleRooms.values()) {
+    if (room.status === 'waiting') rooms.push(sanitizeRoom(room));
+  }
+  return rooms;
+}
+
+function sanitizeTradeRoom(room) {
+  return {
+    id: room.id,
+    users: room.userIds.map((userId) => getUserPublic(userId)),
+    offers: Object.fromEntries(
+      room.userIds.map((userId) => [
+        userId,
+        room.offers[userId]
+          .map((itemId) => {
+            const item = db.getInventoryItem(itemId);
+            return item ? { ...item, rarity_color: rarityColor(item.rarity) } : null;
+          })
+          .filter(Boolean),
+      ])
+    ),
+    ready: room.ready,
+    confirmed: room.confirmed,
+  };
+}
+
+function broadcastTradeRoom(room) {
+  io.to(room.id).emit('trade:update', sanitizeTradeRoom(room));
+}
+
+io.on('connection', (socket) => {
+  userSockets.set(socket.userId, socket.id);
+  socket.join(`user:${socket.userId}`);
+  socket.emit('global:drops_init', { drops: liveDrops });
+  io.emit('trade:online_users', { users: [...userSockets.keys()] });
+
   socket.on('battle:create', ({ caseIds }) => {
-    if (!caseIds || !Array.isArray(caseIds) || caseIds.length === 0) {
-      return socket.emit('battle:error', { error: 'Aucune caisse s\u00e9lectionn\u00e9e' });
+    if (!Array.isArray(caseIds) || caseIds.length === 0) {
+      return socket.emit('battle:error', { error: 'Aucune caisse selectionnee' });
     }
 
-    let totalPrice = 0;
     const casesData = [];
-    for (const cid of caseIds) {
-      const cData = CASES.find(c => c.id === cid);
-      if (!cData) return socket.emit('battle:error', { error: 'Caisse invalide: ' + cid });
-      totalPrice += cData.price;
-      casesData.push(cData);
+    let totalPrice = 0;
+    for (const caseId of caseIds) {
+      const caseData = CASES.find((item) => item.id === caseId);
+      if (!caseData) return socket.emit('battle:error', { error: `Caisse invalide: ${caseId}` });
+      if (caseData.price === 0) return socket.emit('battle:error', { error: 'La caisse gratuite est exclue des battles.' });
+      casesData.push(caseData);
+      totalPrice += caseData.price;
     }
 
     const user = db.getUser(socket.userId);
     if (!user || user.coins < totalPrice) {
-      return socket.emit('battle:error', { error: 'Pas assez de CC pour la totalit\u00e9!' });
+      return socket.emit('battle:error', { error: 'Pas assez de CC pour la totalite' });
     }
 
-    // Deduct coins from creator
     db.setCoins(socket.userId, user.coins - totalPrice);
-
-    const roomId = 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-    
-    const rounds = casesData.map(c => ({
-      caseId: c.id,
-      caseName: c.name,
-      caseIcon: c.icon,
-      caseColor: c.color,
-      price: c.price
-    }));
-
+    const roomId = `room_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const room = {
       id: roomId,
       totalPrice,
-      rounds,
+      rounds: casesData.map((caseData) => ({
+        caseId: caseData.id,
+        caseName: caseData.name,
+        caseIcon: caseData.icon,
+        caseColor: caseData.color,
+        price: caseData.price,
+      })),
       creator: { id: socket.userId, username: socket.username, avatar: socket.avatar, socketId: socket.id },
       joiner: null,
-      status: 'waiting', // waiting | rolling | done
-      createdAt: Date.now(),
+      status: 'waiting',
     };
     battleRooms.set(roomId, room);
     socket.join(roomId);
-
-    socket.emit('battle:created', { roomId, room: sanitizeRoom(room) });
-    // Broadcast updated lobby
+    socket.emit('battle:created', { room: sanitizeRoom(room) });
+    socket.emit('battle:coins', { coins: db.getUser(socket.userId).coins });
     io.emit('battle:lobby', { rooms: getOpenRooms() });
-
-    const freshUser = db.getUser(socket.userId);
-    socket.emit('battle:coins', { coins: freshUser.coins });
   });
 
-  // Join a battle room
   socket.on('battle:join', ({ roomId }) => {
     const room = battleRooms.get(roomId);
     if (!room) return socket.emit('battle:error', { error: 'Room introuvable' });
-    if (room.status !== 'waiting') return socket.emit('battle:error', { error: 'Battle d\u00e9j\u00e0 lanc\u00e9e' });
+    if (room.status !== 'waiting') return socket.emit('battle:error', { error: 'Battle deja lancee' });
     if (room.creator.id === socket.userId) return socket.emit('battle:error', { error: 'Tu ne peux pas rejoindre ta propre room' });
 
     const user = db.getUser(socket.userId);
-    if (!user || user.coins < room.totalPrice) {
-      return socket.emit('battle:error', { error: 'Pas assez de CC!' });
-    }
+    if (!user || user.coins < room.totalPrice) return socket.emit('battle:error', { error: 'Pas assez de CC' });
 
-    // Deduct coins from joiner
     db.setCoins(socket.userId, user.coins - room.totalPrice);
-
     room.joiner = { id: socket.userId, username: socket.username, avatar: socket.avatar, socketId: socket.id };
     room.status = 'rolling';
     socket.join(roomId);
-
-    const freshUser = db.getUser(socket.userId);
-    socket.emit('battle:coins', { coins: freshUser.coins });
-
-    // Broadcast lobby update
+    socket.emit('battle:coins', { coins: db.getUser(socket.userId).coins });
     io.emit('battle:lobby', { rooms: getOpenRooms() });
-
-    // Notify both players the battle is starting
     io.to(roomId).emit('battle:start_all', { room: sanitizeRoom(room) });
 
-    // Run battle loop async
     const battleLoop = async () => {
       let creatorTotalValue = 0;
       let joinerTotalValue = 0;
-      
       const creatorWinnings = [];
       const joinerWinnings = [];
 
-      // Initial pause before first round
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      for (let i = 0; i < room.rounds.length; i++) {
-        const roundData = room.rounds[i];
-        const cData = CASES.find(c => c.id === roundData.caseId);
-        
-        const creatorRoll = rollSkinFromCase(cData);
-        const joinerRoll = rollSkinFromCase(cData);
+      for (let index = 0; index < room.rounds.length; index++) {
+        const round = room.rounds[index];
+        const caseData = CASES.find((item) => item.id === round.caseId);
+        const creatorItem = buildInventoryItemFromRoll(rollSkinFromCase(caseData));
+        const joinerItem = buildInventoryItemFromRoll(rollSkinFromCase(caseData));
+        creatorTotalValue += creatorItem.sell_value;
+        joinerTotalValue += joinerItem.sell_value;
+        creatorWinnings.push(creatorItem);
+        joinerWinnings.push(joinerItem);
 
-        const creatorStrip = generateStrip(cData, creatorRoll);
-        const joinerStrip = generateStrip(cData, joinerRoll);
-
-        const cValue = RARITY_SELL_VALUES[creatorRoll.rarity] || 0;
-        const jValue = RARITY_SELL_VALUES[joinerRoll.rarity] || 0;
-        
-        creatorTotalValue += cValue;
-        joinerTotalValue += jValue;
-
-        creatorWinnings.push({ skin: creatorRoll.skin, rarity: creatorRoll.rarity, value: cValue });
-        joinerWinnings.push({ skin: joinerRoll.skin, rarity: joinerRoll.rarity, value: jValue });
-        
-        io.to(roomId).emit('battle:round_start', { 
-          roundIndex: i, 
-          creatorStrip, 
-          joinerStrip 
+        io.to(roomId).emit('battle:round_start', {
+          roundIndex: index,
+          creatorStrip: generateStrip(caseData, creatorItem),
+          joinerStrip: generateStrip(caseData, joinerItem),
         });
 
-        // wait for animation to finish: ~4s
-        await new Promise(r => setTimeout(r, 4000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+
         io.to(roomId).emit('battle:round_result', {
-          roundIndex: i,
-          creatorSkin: { 
-            skin_name: creatorRoll.skin.name,
-            skin_image: creatorRoll.skin.image || '',
-            rarity: creatorRoll.rarity,
-            rarity_color: creatorRoll.skin.rarity?.color || '#fff',
-            sell_value: cValue
-          },
-          joinerSkin: { 
-            skin_name: joinerRoll.skin.name,
-            skin_image: joinerRoll.skin.image || '',
-            rarity: joinerRoll.rarity,
-            rarity_color: joinerRoll.skin.rarity?.color || '#fff',
-            sell_value: jValue
-          },
-          creatorRoundWins: cValue >= jValue
+          roundIndex: index,
+          creatorSkin: creatorItem,
+          joinerSkin: joinerItem,
+          creatorRoundWins: creatorItem.sell_value >= joinerItem.sell_value,
         });
-        
-        // wait before next round
-        await new Promise(r => setTimeout(r, 1500));
+
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
-      // Determine overall winner
       const creatorWins = creatorTotalValue >= joinerTotalValue;
       const winnerId = creatorWins ? room.creator.id : room.joiner.id;
+      const winnerUser = db.getUser(winnerId);
 
-      // Award ALL skins to winner
-      for (const item of creatorWinnings) {
-        db.addInventoryItem(winnerId, item.skin.id, item.skin.name, item.skin.image || '', item.rarity, item.value);
-      }
-      for (const item of joinerWinnings) {
-        db.addInventoryItem(winnerId, item.skin.id, item.skin.name, item.skin.image || '', item.rarity, item.value);
+      for (const item of [...creatorWinnings, ...joinerWinnings]) {
+        createInventoryRecord(winnerId, item);
+        maybeEmitRareDrop(winnerUser, item, 'Case Battle', 'battle');
       }
 
       room.status = 'done';
@@ -839,73 +911,137 @@ io.on('connection', (socket) => {
         creatorTotalValue,
         joinerTotalValue,
         winnerId,
-        creatorWins
+        creatorWins,
       });
-
-      setTimeout(() => battleRooms.delete(roomId), 30000);
+      setTimeout(() => battleRooms.delete(roomId), 30_000);
     };
 
-    battleLoop().catch(console.error);
+    battleLoop().catch((error) => {
+      console.error('Battle loop error:', error);
+      io.to(roomId).emit('battle:error', { error: 'Erreur serveur durant la battle' });
+    });
   });
 
-  // Request lobby
   socket.on('battle:getLobby', () => {
     socket.emit('battle:lobby', { rooms: getOpenRooms() });
   });
 
-  // Cancel a room (creator only)
   socket.on('battle:cancel', ({ roomId }) => {
     const room = battleRooms.get(roomId);
-    if (!room) return;
-    if (room.creator.id !== socket.userId) return;
-    if (room.status !== 'waiting') return;
-
-    // Refund creator
+    if (!room || room.creator.id !== socket.userId || room.status !== 'waiting') return;
     const user = db.getUser(socket.userId);
     if (user) db.setCoins(socket.userId, user.coins + room.totalPrice);
-
     battleRooms.delete(roomId);
-    io.emit('battle:lobby', { rooms: getOpenRooms() });
     socket.emit('battle:cancelled', { roomId });
-    const freshUser = db.getUser(socket.userId);
-    if (freshUser) socket.emit('battle:coins', { coins: freshUser.coins });
+    socket.emit('battle:coins', { coins: db.getUser(socket.userId).coins });
+    io.emit('battle:lobby', { rooms: getOpenRooms() });
+  });
+
+  socket.on('trade:invite', ({ userId }) => {
+    if (!userId || userId === socket.userId) return;
+    const targetSocketId = userSockets.get(userId);
+    if (!targetSocketId) return socket.emit('trade:error', { error: 'Joueur hors ligne' });
+    tradeInvites.set(`${socket.userId}:${userId}`, { from: socket.userId, to: userId, createdAt: Date.now() });
+    io.to(targetSocketId).emit('trade:invite_received', { from: getUserPublic(socket.userId) });
+  });
+
+  socket.on('trade:accept', ({ userId }) => {
+    const inviteKey = `${userId}:${socket.userId}`;
+    if (!tradeInvites.has(inviteKey)) return socket.emit('trade:error', { error: 'Invitation invalide' });
+    tradeInvites.delete(inviteKey);
+
+    const roomId = `trade_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const room = {
+      id: roomId,
+      userIds: [userId, socket.userId],
+      offers: { [userId]: [], [socket.userId]: [] },
+      ready: { [userId]: false, [socket.userId]: false },
+      confirmed: { [userId]: false, [socket.userId]: false },
+    };
+    tradeRooms.set(roomId, room);
+
+    const otherSocketId = userSockets.get(userId);
+    if (otherSocketId) io.sockets.sockets.get(otherSocketId)?.join(roomId);
+    socket.join(roomId);
+    io.to(roomId).emit('trade:started', sanitizeTradeRoom(room));
+  });
+
+  socket.on('trade:add_item', ({ roomId, inventoryId }) => {
+    const room = tradeRooms.get(roomId);
+    if (!room || !room.userIds.includes(socket.userId)) return;
+    const item = db.getInventoryItem(inventoryId, socket.userId);
+    if (!item) return socket.emit('trade:error', { error: 'Item invalide' });
+    if (!room.offers[socket.userId].includes(inventoryId)) room.offers[socket.userId].push(inventoryId);
+    room.userIds.forEach((userId) => {
+      room.ready[userId] = false;
+      room.confirmed[userId] = false;
+    });
+    broadcastTradeRoom(room);
+  });
+
+  socket.on('trade:remove_item', ({ roomId, inventoryId }) => {
+    const room = tradeRooms.get(roomId);
+    if (!room || !room.userIds.includes(socket.userId)) return;
+    room.offers[socket.userId] = room.offers[socket.userId].filter((id) => id !== inventoryId);
+    room.userIds.forEach((userId) => {
+      room.ready[userId] = false;
+      room.confirmed[userId] = false;
+    });
+    broadcastTradeRoom(room);
+  });
+
+  socket.on('trade:ready', ({ roomId }) => {
+    const room = tradeRooms.get(roomId);
+    if (!room || !room.userIds.includes(socket.userId)) return;
+    room.ready[socket.userId] = !room.ready[socket.userId];
+    room.userIds.forEach((userId) => {
+      room.confirmed[userId] = false;
+    });
+    broadcastTradeRoom(room);
+  });
+
+  socket.on('trade:confirm', ({ roomId }) => {
+    const room = tradeRooms.get(roomId);
+    if (!room || !room.userIds.includes(socket.userId)) return;
+    const [userAId, userBId] = room.userIds;
+    if (!room.ready[userAId] || !room.ready[userBId]) {
+      return socket.emit('trade:error', { error: 'Les deux joueurs doivent etre prets.' });
+    }
+
+    room.confirmed[socket.userId] = true;
+    broadcastTradeRoom(room);
+
+    if (room.confirmed[userAId] && room.confirmed[userBId]) {
+      try {
+        db.swapTradeItems(userAId, room.offers[userAId], userBId, room.offers[userBId]);
+        io.to(room.id).emit('trade:complete', {
+          roomId: room.id,
+          users: room.userIds.map((userId) => getUserPublic(userId)),
+        });
+        tradeRooms.delete(room.id);
+      } catch (error) {
+        console.error('Trade complete error:', error);
+        io.to(room.id).emit('trade:error', { error: 'Echec de validation de l echange.' });
+      }
+    }
+  });
+
+  socket.on('trade:decline', ({ userId }) => {
+    io.to(`user:${userId}`).emit('trade:declined', { user: getUserPublic(socket.userId) });
   });
 
   socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.username}`);
+    userSockets.delete(socket.userId);
+    io.emit('trade:online_users', { users: [...userSockets.keys()] });
   });
 });
 
-function getOpenRooms() {
-  const rooms = [];
-  for (const [id, room] of battleRooms) {
-    if (room.status === 'waiting') {
-      rooms.push(sanitizeRoom(room));
-    }
-  }
-  return rooms;
-}
-
-function sanitizeRoom(room) {
-  return {
-    id: room.id,
-    totalPrice: room.totalPrice,
-    rounds: room.rounds,
-    creator: { username: room.creator.username, avatar: room.creator.avatar },
-    joiner: room.joiner ? { username: room.joiner.username, avatar: room.joiner.avatar } : null,
-    status: room.status,
-  };
-}
-
-// ===== GRACEFUL SHUTDOWN =====
 process.on('SIGINT', () => {
   db.close();
   process.exit(0);
 });
 
-// ===== START (http server for Socket.IO) =====
 server.listen(PORT, () => {
-  console.log(`🎰 ChiboubRoll server running on http://localhost:${PORT}`);
-  console.log(`🔗 Discord login: http://localhost:${PORT}/api/auth/discord`);
-  console.log(`⚔️ Socket.IO ready for Case Battles`);
+  console.log(`ChiboubRoll server running on http://localhost:${PORT}`);
+  console.log(`Discord login: http://localhost:${PORT}/api/auth/discord`);
 });
