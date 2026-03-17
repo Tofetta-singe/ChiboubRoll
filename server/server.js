@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3001;
 // ===== CONFIG =====
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3001/auth/discord/callback';
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'https://chiboubroll.onrender.com/api/user';
+const CLIENT_URL = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app/';
 
 // ===== MIDDLEWARE =====
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
@@ -20,14 +20,14 @@ app.use(express.json());
 
 // ===== UPGRADE DEFINITIONS (server-side validation) =====
 const UPGRADES = {
-  extra_wheel:   { baseCost: 100,  costScale: 2.5, maxLevel: 3 },
-  turbo_spin:    { baseCost: 80,   costScale: 1.8, maxLevel: 5 },
-  multiplier:    { baseCost: 250,  costScale: 3.0, maxLevel: 5 },
-  lucky:         { baseCost: 500,  costScale: 2.8, maxLevel: 4 },
-  auto_spin:     { baseCost: 1000, costScale: 3.5, maxLevel: 3 },
-  golden_wheel:  { baseCost: 2500, costScale: 1,   maxLevel: 1 },
+  extra_wheel: { baseCost: 100, costScale: 2.5, maxLevel: 3 },
+  turbo_spin: { baseCost: 80, costScale: 1.8, maxLevel: 5 },
+  multiplier: { baseCost: 250, costScale: 3.0, maxLevel: 5 },
+  lucky: { baseCost: 500, costScale: 2.8, maxLevel: 4 },
+  auto_spin: { baseCost: 1000, costScale: 3.5, maxLevel: 3 },
+  golden_wheel: { baseCost: 2500, costScale: 1, maxLevel: 1 },
   mega_segments: { baseCost: 1500, costScale: 2.5, maxLevel: 3 },
-  coin_magnet:   { baseCost: 200,  costScale: 1.6, maxLevel: 10 },
+  coin_magnet: { baseCost: 200, costScale: 1.6, maxLevel: 10 },
 };
 
 function getUpgradeCost(upgradeId, currentLevel) {
