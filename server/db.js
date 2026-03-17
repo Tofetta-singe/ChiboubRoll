@@ -19,6 +19,12 @@ db.exec(`
     spin_streak INTEGER DEFAULT 0,
     last_spin_at TEXT,
     free_case_last_opened TEXT,
+    showcase_item_id INTEGER,
+    showcase_skin_name TEXT,
+    showcase_skin_image TEXT,
+    showcase_rarity TEXT,
+    showcase_float_value REAL,
+    showcase_wear_short TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -59,6 +65,12 @@ try { db.exec('ALTER TABLE users ADD COLUMN spins_since_power INTEGER DEFAULT 0'
 try { db.exec('ALTER TABLE users ADD COLUMN spin_streak INTEGER DEFAULT 0'); } catch { }
 try { db.exec('ALTER TABLE users ADD COLUMN last_spin_at TEXT'); } catch { }
 try { db.exec('ALTER TABLE users ADD COLUMN free_case_last_opened TEXT'); } catch { }
+try { db.exec('ALTER TABLE users ADD COLUMN showcase_item_id INTEGER'); } catch { }
+try { db.exec('ALTER TABLE users ADD COLUMN showcase_skin_name TEXT'); } catch { }
+try { db.exec('ALTER TABLE users ADD COLUMN showcase_skin_image TEXT'); } catch { }
+try { db.exec('ALTER TABLE users ADD COLUMN showcase_rarity TEXT'); } catch { }
+try { db.exec('ALTER TABLE users ADD COLUMN showcase_float_value REAL'); } catch { }
+try { db.exec('ALTER TABLE users ADD COLUMN showcase_wear_short TEXT'); } catch { }
 try { db.exec('ALTER TABLE inventory ADD COLUMN float_value REAL DEFAULT 0.5'); } catch { }
 try { db.exec('ALTER TABLE inventory ADD COLUMN wear_name TEXT DEFAULT "Field-Tested"'); } catch { }
 try { db.exec('ALTER TABLE inventory ADD COLUMN wear_short TEXT DEFAULT "FT"'); } catch { }
@@ -103,6 +115,42 @@ const stmts = {
     UPDATE users SET free_case_last_opened = datetime('now'), updated_at = datetime('now') WHERE id = ?
   `),
 
+  setShowcaseItem: db.prepare(`
+    UPDATE users
+    SET showcase_item_id = ?,
+        showcase_skin_name = ?,
+        showcase_skin_image = ?,
+        showcase_rarity = ?,
+        showcase_float_value = ?,
+        showcase_wear_short = ?,
+        updated_at = datetime('now')
+    WHERE id = ?
+  `),
+
+  clearShowcaseItem: db.prepare(`
+    UPDATE users
+    SET showcase_item_id = NULL,
+        showcase_skin_name = NULL,
+        showcase_skin_image = NULL,
+        showcase_rarity = NULL,
+        showcase_float_value = NULL,
+        showcase_wear_short = NULL,
+        updated_at = datetime('now')
+    WHERE id = ? AND showcase_item_id = ?
+  `),
+
+  clearCurrentShowcase: db.prepare(`
+    UPDATE users
+    SET showcase_item_id = NULL,
+        showcase_skin_name = NULL,
+        showcase_skin_image = NULL,
+        showcase_rarity = NULL,
+        showcase_float_value = NULL,
+        showcase_wear_short = NULL,
+        updated_at = datetime('now')
+    WHERE id = ?
+  `),
+
   getUpgrades: db.prepare('SELECT upgrade_id, level FROM upgrades WHERE user_id = ?'),
 
   setUpgrade: db.prepare(`
@@ -112,7 +160,9 @@ const stmts = {
   `),
 
   getLeaderboard: db.prepare(`
-    SELECT id, username, avatar, coins, total_earned, total_spins
+    SELECT id, username, avatar, coins, total_earned, total_spins,
+           showcase_item_id, showcase_skin_name, showcase_skin_image,
+           showcase_rarity, showcase_float_value, showcase_wear_short
     FROM users
     ORDER BY total_earned DESC
     LIMIT 10
@@ -153,9 +203,11 @@ const swapTradeItemsTx = db.transaction((userAId, userAItemIds, userBId, userBIt
   }
 
   for (const itemId of userAItemIds) {
+    stmts.clearShowcaseItem.run(userAId, itemId);
     stmts.transferInventoryItem.run(userBId, itemId);
   }
   for (const itemId of userBItemIds) {
+    stmts.clearShowcaseItem.run(userBId, itemId);
     stmts.transferInventoryItem.run(userAId, itemId);
   }
 });
@@ -190,6 +242,29 @@ module.exports = {
 
   markFreeCaseOpened(userId) {
     stmts.setFreeCaseLastOpened.run(userId);
+    return stmts.getUser.get(userId);
+  },
+
+  setShowcaseItem(userId, item) {
+    stmts.setShowcaseItem.run(
+      item.id,
+      item.skin_name,
+      item.skin_image,
+      item.rarity,
+      item.float_value,
+      item.wear_short,
+      userId
+    );
+    return stmts.getUser.get(userId);
+  },
+
+  clearShowcaseItem(userId, itemId) {
+    stmts.clearShowcaseItem.run(userId, itemId);
+    return stmts.getUser.get(userId);
+  },
+
+  clearCurrentShowcase(userId) {
+    stmts.clearCurrentShowcase.run(userId);
     return stmts.getUser.get(userId);
   },
 
@@ -235,6 +310,7 @@ module.exports = {
   },
 
   deleteInventoryItem(itemId, userId) {
+    stmts.clearShowcaseItem.run(userId, itemId);
     return stmts.deleteInventoryItem.run(itemId, userId);
   },
 

@@ -20,11 +20,11 @@ const RARITY_SELL_VALUES = {
   'Consumer Grade': 5,
   'Industrial Grade': 15,
   'Mil-Spec Grade': 40,
-  Restricted: 120,
-  Classified: 350,
-  Covert: 1000,
-  Extraordinary: 3500,
-  Contraband: 15000,
+  Restricted: 240,
+  Classified: 900,
+  Covert: 3500,
+  Extraordinary: 12000,
+  Contraband: 50000,
 };
 
 const RARITY_ORDER = [
@@ -70,10 +70,10 @@ const CASES = [
     color: '#60d394',
     cooldownMs: FREE_CASE_COOLDOWN_MS,
     drops: [
-      { rarity: 'Consumer Grade', weight: 55 },
-      { rarity: 'Industrial Grade', weight: 28 },
-      { rarity: 'Mil-Spec Grade', weight: 12 },
-      { rarity: 'Restricted', weight: 5 },
+      { rarity: 'Consumer Grade', weight: 64 },
+      { rarity: 'Industrial Grade', weight: 24 },
+      { rarity: 'Mil-Spec Grade', weight: 10 },
+      { rarity: 'Restricted', weight: 2 },
     ],
   },
   {
@@ -83,10 +83,10 @@ const CASES = [
     price: 25,
     color: '#b0c3d9',
     drops: [
-      { rarity: 'Consumer Grade', weight: 62 },
-      { rarity: 'Industrial Grade', weight: 25 },
-      { rarity: 'Mil-Spec Grade', weight: 10 },
-      { rarity: 'Restricted', weight: 3 },
+      { rarity: 'Consumer Grade', weight: 67 },
+      { rarity: 'Industrial Grade', weight: 22 },
+      { rarity: 'Mil-Spec Grade', weight: 9 },
+      { rarity: 'Restricted', weight: 2 },
     ],
   },
   {
@@ -96,11 +96,11 @@ const CASES = [
     price: 50,
     color: '#5e98d9',
     drops: [
-      { rarity: 'Consumer Grade', weight: 50 },
-      { rarity: 'Industrial Grade', weight: 24 },
-      { rarity: 'Mil-Spec Grade', weight: 16 },
-      { rarity: 'Restricted', weight: 7 },
-      { rarity: 'Classified', weight: 3 },
+      { rarity: 'Consumer Grade', weight: 57 },
+      { rarity: 'Industrial Grade', weight: 22 },
+      { rarity: 'Mil-Spec Grade', weight: 14 },
+      { rarity: 'Restricted', weight: 6 },
+      { rarity: 'Classified', weight: 1 },
     ],
   },
   {
@@ -110,11 +110,11 @@ const CASES = [
     price: 200,
     color: '#4b69ff',
     drops: [
-      { rarity: 'Industrial Grade', weight: 34 },
-      { rarity: 'Mil-Spec Grade', weight: 28 },
-      { rarity: 'Restricted', weight: 23 },
-      { rarity: 'Classified', weight: 11 },
-      { rarity: 'Covert', weight: 4 },
+      { rarity: 'Industrial Grade', weight: 39 },
+      { rarity: 'Mil-Spec Grade', weight: 29 },
+      { rarity: 'Restricted', weight: 19 },
+      { rarity: 'Classified', weight: 10 },
+      { rarity: 'Covert', weight: 3 },
     ],
   },
   {
@@ -124,11 +124,11 @@ const CASES = [
     price: 500,
     color: '#8847ff',
     drops: [
-      { rarity: 'Mil-Spec Grade', weight: 25 },
-      { rarity: 'Restricted', weight: 32 },
-      { rarity: 'Classified', weight: 23 },
-      { rarity: 'Covert', weight: 13 },
-      { rarity: 'Extraordinary', weight: 7 },
+      { rarity: 'Mil-Spec Grade', weight: 31 },
+      { rarity: 'Restricted', weight: 31 },
+      { rarity: 'Classified', weight: 21 },
+      { rarity: 'Covert', weight: 12 },
+      { rarity: 'Extraordinary', weight: 5 },
     ],
   },
   {
@@ -138,11 +138,11 @@ const CASES = [
     price: 1500,
     color: '#d32ce6',
     drops: [
-      { rarity: 'Restricted', weight: 17 },
-      { rarity: 'Classified', weight: 32 },
-      { rarity: 'Covert', weight: 27 },
-      { rarity: 'Extraordinary', weight: 18 },
-      { rarity: 'Contraband', weight: 6 },
+      { rarity: 'Restricted', weight: 24 },
+      { rarity: 'Classified', weight: 31 },
+      { rarity: 'Covert', weight: 24 },
+      { rarity: 'Extraordinary', weight: 16 },
+      { rarity: 'Contraband', weight: 5 },
     ],
   },
   {
@@ -152,10 +152,10 @@ const CASES = [
     price: 5000,
     color: '#e4ae39',
     drops: [
-      { rarity: 'Classified', weight: 14 },
-      { rarity: 'Covert', weight: 33 },
-      { rarity: 'Extraordinary', weight: 45 },
-      { rarity: 'Contraband', weight: 8 },
+      { rarity: 'Classified', weight: 18 },
+      { rarity: 'Covert', weight: 34 },
+      { rarity: 'Extraordinary', weight: 43 },
+      { rarity: 'Contraband', weight: 5 },
     ],
   },
   {
@@ -165,11 +165,11 @@ const CASES = [
     price: 85,
     color: '#7f8c8d',
     drops: [
-      { rarity: 'Consumer Grade', weight: 42 },
-      { rarity: 'Industrial Grade', weight: 28 },
-      { rarity: 'Mil-Spec Grade', weight: 18 },
-      { rarity: 'Restricted', weight: 9 },
-      { rarity: 'Classified', weight: 3 },
+      { rarity: 'Consumer Grade', weight: 49 },
+      { rarity: 'Industrial Grade', weight: 27 },
+      { rarity: 'Mil-Spec Grade', weight: 16 },
+      { rarity: 'Restricted', weight: 6 },
+      { rarity: 'Classified', weight: 2 },
     ],
   },
   {
@@ -179,11 +179,11 @@ const CASES = [
     price: 320,
     color: '#7dd3fc',
     drops: [
-      { rarity: 'Industrial Grade', weight: 24 },
-      { rarity: 'Mil-Spec Grade', weight: 30 },
-      { rarity: 'Restricted', weight: 24 },
-      { rarity: 'Classified', weight: 15 },
-      { rarity: 'Covert', weight: 7 },
+      { rarity: 'Industrial Grade', weight: 28 },
+      { rarity: 'Mil-Spec Grade', weight: 32 },
+      { rarity: 'Restricted', weight: 22 },
+      { rarity: 'Classified', weight: 13 },
+      { rarity: 'Covert', weight: 5 },
     ],
   },
   {
@@ -193,11 +193,11 @@ const CASES = [
     price: 750,
     color: '#ff6b35',
     drops: [
-      { rarity: 'Mil-Spec Grade', weight: 18 },
-      { rarity: 'Restricted', weight: 31 },
-      { rarity: 'Classified', weight: 25 },
-      { rarity: 'Covert', weight: 18 },
-      { rarity: 'Extraordinary', weight: 8 },
+      { rarity: 'Mil-Spec Grade', weight: 24 },
+      { rarity: 'Restricted', weight: 32 },
+      { rarity: 'Classified', weight: 24 },
+      { rarity: 'Covert', weight: 15 },
+      { rarity: 'Extraordinary', weight: 5 },
     ],
   },
   {
@@ -207,11 +207,11 @@ const CASES = [
     price: 980,
     color: '#ff8fab',
     drops: [
-      { rarity: 'Restricted', weight: 24 },
-      { rarity: 'Classified', weight: 31 },
-      { rarity: 'Covert', weight: 24 },
-      { rarity: 'Extraordinary', weight: 15 },
-      { rarity: 'Contraband', weight: 6 },
+      { rarity: 'Restricted', weight: 30 },
+      { rarity: 'Classified', weight: 30 },
+      { rarity: 'Covert', weight: 22 },
+      { rarity: 'Extraordinary', weight: 14 },
+      { rarity: 'Contraband', weight: 4 },
     ],
   },
   {
@@ -221,10 +221,10 @@ const CASES = [
     price: 2600,
     color: '#8b5cf6',
     drops: [
-      { rarity: 'Classified', weight: 24 },
-      { rarity: 'Covert', weight: 34 },
-      { rarity: 'Extraordinary', weight: 31 },
-      { rarity: 'Contraband', weight: 11 },
+      { rarity: 'Classified', weight: 29 },
+      { rarity: 'Covert', weight: 35 },
+      { rarity: 'Extraordinary', weight: 30 },
+      { rarity: 'Contraband', weight: 6 },
     ],
   },
 ];
@@ -249,7 +249,7 @@ const CLIENT_URL = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app';
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 
-const spinCooldowns = new Map();
+const activeSpinRequests = new Set();
 const liveDrops = [];
 
 const UPGRADES = {
@@ -297,18 +297,13 @@ function buildInventoryItemFromRoll(roll) {
   };
 }
 
-function isRareRarity(rarity) {
-  return RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf('Classified');
-}
-
 function createLiveDrop(payload) {
   liveDrops.unshift(payload);
   liveDrops.splice(LIVE_FEED_LIMIT);
   io.emit('global:drop', payload);
 }
 
-function maybeEmitRareDrop(user, item, caseName, source = 'case') {
-  if (!isRareRarity(item.rarity)) return;
+function emitGlobalDrop(user, item, caseName, source = 'case') {
   createLiveDrop({
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     source,
@@ -408,7 +403,7 @@ function rewardBattlepass(userId, tier) {
     rarity: tier.reward.rarity,
   });
   const record = createInventoryRecord(userId, item);
-  maybeEmitRareDrop(user, record, `Battlepass ${tier.id.toUpperCase()}`, 'battlepass');
+  emitGlobalDrop(user, record, `Battlepass ${tier.id.toUpperCase()}`, 'battlepass');
   return {
     rewardType: 'skin',
     item: record,
@@ -495,82 +490,86 @@ app.get('/api/me', authMiddleware, (req, res) => {
 });
 
 app.post('/api/spin', authMiddleware, (req, res) => {
-  const now = Date.now();
-  const lastSpin = spinCooldowns.get(req.userId) || 0;
-  if (now - lastSpin < 1500) {
-    return res.status(429).json({ error: 'Trop rapide, attends la fin de l animation.' });
+  if (activeSpinRequests.has(req.userId)) {
+    return res.status(429).json({ error: 'Spin deja en cours.' });
   }
-  spinCooldowns.set(req.userId, now);
+  activeSpinRequests.add(req.userId);
 
-  const user = db.getUser(req.userId);
-  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
-
-  const upgrades = db.getUpgrades(req.userId);
-  const multiplierLevel = upgrades.multiplier || 0;
-  const coinMultiplier = Math.pow(1.8, multiplierLevel);
-  const magnetBonus = 1 + (upgrades.coin_magnet || 0) * 0.1;
-  const wheelCount = 1 + (upgrades.extra_wheel || 0);
-  const luckyLevel = upgrades.lucky || 0;
-  const powerRollLevel = upgrades.power_roll || 0;
-  const powerBoostLevel = upgrades.power_roll_boost || 0;
-  const powerFreqLevel = upgrades.power_roll_freq || 0;
-  const powerRollThreshold = Math.max(10, 25 - powerFreqLevel * 3);
-  const powerRollMultiplier = 5 + powerBoostLevel * 2;
-  const spinsBeforePower = user.spins_since_power || 0;
-  const isPowerRoll = powerRollLevel > 0 && spinsBeforePower >= powerRollThreshold - 1;
-
-  const comboLevel = upgrades.combo_streak || 0;
-  const lastSpinTime = user.last_spin_at ? new Date(`${user.last_spin_at}Z`).getTime() : 0;
-  let currentStreak = user.spin_streak || 0;
-  if (Date.now() - lastSpinTime > 30_000) currentStreak = 0;
-  const streakBonus = comboLevel > 0 ? 1 + currentStreak * 0.05 * comboLevel : 1;
-
-  const diamondProc = (upgrades.diamond_rain || 0) > 0 && Math.random() < (upgrades.diamond_rain || 0) * 0.05;
-  const jackpotProc = (upgrades.jackpot_chance || 0) > 0 && Math.random() < (upgrades.jackpot_chance || 0) * 0.02;
-
-  let totalWin = 0;
-  const results = [];
-
-  for (let wheelIndex = 0; wheelIndex < wheelCount; wheelIndex++) {
-    const segments = getServerSegments(wheelIndex, upgrades);
-    let winIndex;
-
-    if (luckyLevel > 0 && Math.random() < luckyLevel * 0.12) {
-      const sorted = segments.map((value, index) => ({ value, index })).sort((a, b) => b.value - a.value);
-      const topThird = sorted.slice(0, Math.ceil(sorted.length / 3));
-      winIndex = topThird[Math.floor(Math.random() * topThird.length)].index;
-    } else {
-      winIndex = Math.floor(Math.random() * segments.length);
+  try {
+    const user = db.getUser(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouve' });
     }
 
-    let earned = Math.floor(segments[winIndex] * coinMultiplier * magnetBonus * streakBonus);
-    if (isPowerRoll) earned = Math.floor(earned * powerRollMultiplier);
-    totalWin += earned;
-    results.push({ wheelIndex, segmentIndex: winIndex, value: earned });
+    const upgrades = db.getUpgrades(req.userId);
+    const multiplierLevel = upgrades.multiplier || 0;
+    const coinMultiplier = Math.pow(1.8, multiplierLevel);
+    const magnetBonus = 1 + (upgrades.coin_magnet || 0) * 0.1;
+    const wheelCount = 1 + (upgrades.extra_wheel || 0);
+    const luckyLevel = upgrades.lucky || 0;
+    const powerRollLevel = upgrades.power_roll || 0;
+    const powerBoostLevel = upgrades.power_roll_boost || 0;
+    const powerFreqLevel = upgrades.power_roll_freq || 0;
+    const powerRollThreshold = Math.max(10, 25 - powerFreqLevel * 3);
+    const powerRollMultiplier = 5 + powerBoostLevel * 2;
+    const spinsBeforePower = user.spins_since_power || 0;
+    const isPowerRoll = powerRollLevel > 0 && spinsBeforePower >= powerRollThreshold - 1;
+
+    const comboLevel = upgrades.combo_streak || 0;
+    const lastSpinTime = user.last_spin_at ? new Date(`${user.last_spin_at}Z`).getTime() : 0;
+    let currentStreak = user.spin_streak || 0;
+    if (Date.now() - lastSpinTime > 30_000) currentStreak = 0;
+    const streakBonus = comboLevel > 0 ? 1 + currentStreak * 0.05 * comboLevel : 1;
+
+    const diamondProc = (upgrades.diamond_rain || 0) > 0 && Math.random() < (upgrades.diamond_rain || 0) * 0.05;
+    const jackpotProc = (upgrades.jackpot_chance || 0) > 0 && Math.random() < (upgrades.jackpot_chance || 0) * 0.02;
+
+    let totalWin = 0;
+    const results = [];
+
+    for (let wheelIndex = 0; wheelIndex < wheelCount; wheelIndex++) {
+      const segments = getServerSegments(wheelIndex, upgrades);
+      let winIndex;
+
+      if (luckyLevel > 0 && Math.random() < luckyLevel * 0.12) {
+        const sorted = segments.map((value, index) => ({ value, index })).sort((a, b) => b.value - a.value);
+        const topThird = sorted.slice(0, Math.ceil(sorted.length / 3));
+        winIndex = topThird[Math.floor(Math.random() * topThird.length)].index;
+      } else {
+        winIndex = Math.floor(Math.random() * segments.length);
+      }
+
+      let earned = Math.floor(segments[winIndex] * coinMultiplier * magnetBonus * streakBonus);
+      if (isPowerRoll) earned = Math.floor(earned * powerRollMultiplier);
+      totalWin += earned;
+      results.push({ wheelIndex, segmentIndex: winIndex, value: earned });
+    }
+
+    if (diamondProc) totalWin *= 2;
+    if (jackpotProc) totalWin *= 10;
+
+    db.addCoins(req.userId, totalWin);
+    if (isPowerRoll) db.resetPowerCounter(req.userId);
+    db.updateStreak(req.userId, currentStreak + 1);
+
+    const freshUser = db.getUser(req.userId);
+    res.json({
+      results,
+      totalWin,
+      coins: freshUser.coins,
+      totalEarned: freshUser.total_earned,
+      totalSpins: freshUser.total_spins,
+      isPowerRoll,
+      powerRollMultiplier: isPowerRoll ? powerRollMultiplier : null,
+      isDiamondRain: diamondProc,
+      isJackpot: jackpotProc,
+      comboStreak: currentStreak + 1,
+      spinsSincePower: isPowerRoll ? 0 : freshUser.spins_since_power || 0,
+      powerRollThreshold,
+    });
+  } finally {
+    activeSpinRequests.delete(req.userId);
   }
-
-  if (diamondProc) totalWin *= 2;
-  if (jackpotProc) totalWin *= 10;
-
-  db.addCoins(req.userId, totalWin);
-  if (isPowerRoll) db.resetPowerCounter(req.userId);
-  db.updateStreak(req.userId, currentStreak + 1);
-
-  const freshUser = db.getUser(req.userId);
-  res.json({
-    results,
-    totalWin,
-    coins: freshUser.coins,
-    totalEarned: freshUser.total_earned,
-    totalSpins: freshUser.total_spins,
-    isPowerRoll,
-    powerRollMultiplier: isPowerRoll ? powerRollMultiplier : null,
-    isDiamondRain: diamondProc,
-    isJackpot: jackpotProc,
-    comboStreak: currentStreak + 1,
-    spinsSincePower: isPowerRoll ? 0 : freshUser.spins_since_power || 0,
-    powerRollThreshold,
-  });
 });
 
 app.post('/api/upgrade', authMiddleware, (req, res) => {
@@ -594,7 +593,12 @@ app.post('/api/upgrade', authMiddleware, (req, res) => {
 });
 
 app.get('/api/leaderboard', (req, res) => {
-  res.json({ leaderboard: db.getLeaderboard() });
+  res.json({
+    leaderboard: db.getLeaderboard().map((player) => ({
+      ...player,
+      showcase_rarity_color: player.showcase_rarity ? rarityColor(player.showcase_rarity) : null,
+    })),
+  });
 });
 
 app.get('/api/cases', (req, res) => {
@@ -644,7 +648,7 @@ app.post('/api/cases/open', authMiddleware, (req, res) => {
   const results = [];
   for (let index = 0; index < amount; index++) {
     const item = createInventoryRecord(req.userId, buildInventoryItemFromRoll(rollSkinFromCase(caseData)));
-    maybeEmitRareDrop(opener, item, caseData.name, 'case');
+    emitGlobalDrop(opener, item, caseData.name, 'case');
     results.push({ item, strip: generateStrip(caseData, item) });
   }
 
@@ -678,6 +682,20 @@ app.post('/api/inventory/sell', authMiddleware, (req, res) => {
   res.json({ coins: updatedUser.coins, soldValue: item.sell_value });
 });
 
+app.post('/api/profile/showcase', authMiddleware, (req, res) => {
+  const { itemId } = req.body;
+
+  if (!itemId) {
+    return res.json({ user: db.clearCurrentShowcase(req.userId) });
+  }
+
+  const item = db.getInventoryItem(itemId, req.userId);
+  if (!item) return res.status(404).json({ error: 'Skin introuvable pour la vitrine' });
+
+  const updatedUser = db.setShowcaseItem(req.userId, item);
+  res.json({ user: updatedUser });
+});
+
 app.post('/api/case-battle/start', authMiddleware, (req, res) => {
   const { caseId } = req.body;
   const caseData = CASES.find((item) => item.id === caseId);
@@ -695,8 +713,8 @@ app.post('/api/case-battle/start', authMiddleware, (req, res) => {
   if (playerWins) {
     createInventoryRecord(req.userId, playerSkin);
     createInventoryRecord(req.userId, botSkin);
-    maybeEmitRareDrop(user, playerSkin, caseData.name, 'battle');
-    maybeEmitRareDrop(user, botSkin, caseData.name, 'battle');
+    emitGlobalDrop(user, playerSkin, caseData.name, 'battle');
+    emitGlobalDrop(user, botSkin, caseData.name, 'battle');
   }
 
   res.json({
@@ -903,7 +921,7 @@ io.on('connection', (socket) => {
 
       for (const item of [...creatorWinnings, ...joinerWinnings]) {
         createInventoryRecord(winnerId, item);
-        maybeEmitRareDrop(winnerUser, item, 'Case Battle', 'battle');
+        emitGlobalDrop(winnerUser, item, 'Case Battle', 'battle');
       }
 
       room.status = 'done';

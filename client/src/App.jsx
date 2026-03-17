@@ -15,12 +15,13 @@ import LiveDropFeed from './components/LiveDropFeed';
 import TradePanel from './components/TradePanel';
 
 export default function App() {
-  const { isAuthenticated, loading, user, token, logout } = useAuth();
+  const { isAuthenticated, loading, user, token, logout, loadUser } = useAuth();
   const [activePanel, setActivePanel] = useState(null);
   const [socket, setSocket] = useState(null);
   const [tradeInvite, setTradeInvite] = useState(null);
   const [tradeRoom, setTradeRoom] = useState(null);
   const [tradeNotice, setTradeNotice] = useState(null);
+  const [onlineUserIds, setOnlineUserIds] = useState([]);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -39,15 +40,17 @@ export default function App() {
     nextSocket.on('trade:complete', () => {
       setTradeNotice('Echange termine.');
       setTradeRoom(null);
+      loadUser();
     });
     nextSocket.on('trade:declined', ({ user: tradeUser }) => {
       setTradeNotice(`${tradeUser?.username || 'Un joueur'} a refuse l invitation.`);
     });
     nextSocket.on('trade:error', ({ error }) => setTradeNotice(error));
+    nextSocket.on('trade:online_users', ({ users }) => setOnlineUserIds(users || []));
     setSocket(nextSocket);
 
     return () => nextSocket.disconnect();
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, loadUser]);
 
   useEffect(() => {
     if (!tradeNotice) return undefined;
@@ -72,13 +75,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen relative">
-      <LiveDropFeed
-        socket={socket}
-        onInviteTrade={(targetUserId) => {
-          if (socket) socket.emit('trade:invite', { userId: targetUserId });
-          setTradeNotice('Invitation envoyee.');
-        }}
-      />
+      {!activePanel && !tradeRoom && (
+        <LiveDropFeed
+          socket={socket}
+          onInviteTrade={(targetUserId) => {
+            if (socket) socket.emit('trade:invite', { userId: targetUserId });
+            setTradeNotice('Invitation envoyee.');
+          }}
+        />
+      )}
 
       <header className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-6 bg-dark-900/85 backdrop-blur-xl border-b border-white/10 z-[100]">
         <h1 className="text-xl font-extrabold bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-600 bg-clip-text text-transparent">
@@ -124,13 +129,21 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex flex-col items-center justify-center min-h-screen pt-28 pb-10 pl-[320px] pr-8 relative z-10 max-[1100px]:pl-8">
+      <main className={`flex flex-col items-center justify-center min-h-screen pt-28 pb-10 pr-8 relative z-10 ${!activePanel && !tradeRoom ? 'pl-[320px] max-[1100px]:pl-8' : 'pl-8'}`}>
         <Dashboard />
         <WheelGame />
       </main>
 
       <Shop isOpen={activePanel === 'shop'} onClose={() => setActivePanel(null)} />
-      <Leaderboard isOpen={activePanel === 'leaderboard'} onClose={() => setActivePanel(null)} />
+      <Leaderboard
+        isOpen={activePanel === 'leaderboard'}
+        onClose={() => setActivePanel(null)}
+        onlineUserIds={onlineUserIds}
+        onInviteTrade={(targetUserId) => {
+          if (socket) socket.emit('trade:invite', { userId: targetUserId });
+          setTradeNotice('Invitation envoyee.');
+        }}
+      />
       <CaseOpening isOpen={activePanel === 'cases'} onClose={() => setActivePanel(null)} />
       <Inventory isOpen={activePanel === 'inventory'} onClose={() => setActivePanel(null)} />
       <Battlepass isOpen={activePanel === 'battlepass'} onClose={() => setActivePanel(null)} />

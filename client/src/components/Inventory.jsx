@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fetchInventory, sellSkin } from '../lib/api';
+import { fetchInventory, sellSkin, setShowcaseSkin } from '../lib/api';
 
 export default function Inventory({ isOpen, onClose }) {
-  const { token, updateUserData } = useAuth();
+  const { token, user, updateUserData } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sellingId, setSellingId] = useState(null);
@@ -38,6 +38,16 @@ export default function Inventory({ isOpen, onClose }) {
     }
   };
 
+  const handleShowcase = async (item) => {
+    try {
+      const data = await setShowcaseSkin(token, item.id);
+      updateUserData(data.user);
+      showToast('Skin vitrine mise a jour', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -69,13 +79,21 @@ export default function Inventory({ isOpen, onClose }) {
                   <div className="text-[11px] text-gray-400 mb-3">
                     {item.wear_name} ({item.wear_short}) • {Number(item.float_value).toFixed(4)}
                   </div>
-                  <button
-                    onClick={() => handleSell(item)}
-                    disabled={sellingId === item.id}
-                    className="w-full flex items-center justify-center gap-1 bg-gradient-to-br from-yellow-500/80 to-amber-600/80 text-dark-900 font-bold py-1.5 rounded-lg text-xs disabled:opacity-50"
-                  >
-                    Vendre ({item.sell_value} CC)
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleShowcase(item)}
+                      className={`w-full flex items-center justify-center gap-1 font-bold py-1.5 rounded-lg text-xs ${user?.showcase_item_id === item.id ? 'bg-cyan-500 text-white' : 'bg-white/10 text-gray-200'}`}
+                    >
+                      {user?.showcase_item_id === item.id ? 'Equipee' : 'Afficher'}
+                    </button>
+                    <button
+                      onClick={() => handleSell(item)}
+                      disabled={sellingId === item.id}
+                      className="w-full flex items-center justify-center gap-1 bg-gradient-to-br from-yellow-500/80 to-amber-600/80 text-dark-900 font-bold py-1.5 rounded-lg text-xs disabled:opacity-50"
+                    >
+                      Vendre ({item.sell_value} CC)
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

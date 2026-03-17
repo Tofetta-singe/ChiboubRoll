@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { fetchCases, openCase, sellSkin } from '../lib/api';
+
+const STRIP_ITEM_WIDTH = 84;
+const STRIP_GAP = 8;
 
 export default function CaseOpening({ isOpen, onClose }) {
   const { token, user, updateUserData } = useAuth();
@@ -13,9 +16,10 @@ export default function CaseOpening({ isOpen, onClose }) {
   const stripRefs = useRef([]);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchCases().then((data) => setCases(data.cases || [])).catch((error) => showToast(error.message, 'error'));
-    }
+    if (!isOpen) return;
+    fetchCases()
+      .then((data) => setCases(data.cases || []))
+      .catch((error) => showToast(error.message, 'error'));
   }, [isOpen]);
 
   const showToast = (msg, type = 'success') => {
@@ -23,15 +27,11 @@ export default function CaseOpening({ isOpen, onClose }) {
     setTimeout(() => setToast(null), 2500);
   };
 
-  const canAfford = useMemo(() => {
-    if (!selectedCase || !user) return false;
-    return user.coins >= selectedCase.price * amount;
-  }, [selectedCase, user, amount]);
-
   const handleOpen = async (caseData) => {
     if (opening) return;
+
     const nextAmount = caseData.price === 0 ? 1 : amount;
-    if (user.coins < caseData.price * nextAmount) {
+    if ((user?.coins || 0) < caseData.price * nextAmount) {
       showToast('Pas assez de Chiboub Coins!', 'error');
       return;
     }
@@ -55,36 +55,45 @@ export default function CaseOpening({ isOpen, onClose }) {
   };
 
   const animateStrips = async (items) => {
-    await Promise.all(items.map((entry, index) => new Promise((resolve) => {
-      const strip = stripRefs.current[index];
-      if (!strip) return resolve();
+    await Promise.all(
+      items.map((entry, index) => new Promise((resolve) => {
+        const strip = stripRefs.current[index];
+        if (!strip) return resolve();
 
-      strip.innerHTML = '';
-      entry.strip.forEach((item) => {
-        const div = document.createElement('div');
-        div.className = 'case-strip-item';
-        div.style.borderColor = item.rarity_color;
-        div.innerHTML = `
-          <div style="font-size:10px;font-weight:800;color:${item.rarity_color};text-align:center;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">
-            ${item.skin_name}
-          </div>
-          <div style="font-size:10px;color:#cbd5e1">${item.wear_short} ${Number(item.float_value).toFixed(4)}</div>
-        `;
-        strip.appendChild(div);
-      });
-
-      const containerWidth = strip.parentElement?.clientWidth || 900;
-      const targetOffset = 35 * 100 - containerWidth / 2 + 50;
-      strip.style.transition = 'none';
-      strip.style.transform = 'translateX(0)';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          strip.style.transition = `transform ${3.5 + index * 0.15}s cubic-bezier(0.15, 0.85, 0.35, 1)`;
-          strip.style.transform = `translateX(-${targetOffset}px)`;
+        strip.innerHTML = '';
+        entry.strip.forEach((item) => {
+          const div = document.createElement('div');
+          div.className = 'case-strip-item';
+          div.style.borderColor = item.rarity_color;
+          div.innerHTML = `
+            <div style="width:100%;height:40px;display:flex;align-items:center;justify-content:center;padding:0 4px;overflow:hidden;">
+              ${item.skin_image
+                ? `<img src="${item.skin_image}" alt="" style="max-width:64px;max-height:34px;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.45));" />`
+                : `<div style="width:56px;height:24px;border-radius:8px;background:${item.rarity_color}22;"></div>`}
+            </div>
+            <div style="font-size:9px;font-weight:800;color:${item.rarity_color};text-align:center;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">
+              ${item.skin_name}
+            </div>
+            <div style="font-size:8px;color:#cbd5e1">${item.wear_short} ${Number(item.float_value).toFixed(4)}</div>
+          `;
+          strip.appendChild(div);
         });
-      });
-      setTimeout(resolve, 3900 + index * 150);
-    })));
+
+        const containerWidth = strip.parentElement?.clientWidth || 900;
+        const targetOffset = 35 * (STRIP_ITEM_WIDTH + STRIP_GAP) - containerWidth / 2 + STRIP_ITEM_WIDTH / 2;
+        strip.style.transition = 'none';
+        strip.style.transform = 'translateX(0)';
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            strip.style.transition = `transform ${3.5 + index * 0.15}s cubic-bezier(0.15, 0.85, 0.35, 1)`;
+            strip.style.transform = `translateX(-${targetOffset}px)`;
+          });
+        });
+
+        setTimeout(resolve, 3900 + index * 150);
+      }))
+    );
   };
 
   const handleSell = async (item) => {
@@ -181,18 +190,25 @@ export default function CaseOpening({ isOpen, onClose }) {
                       <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-28 mb-4">
                         <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10" />
                         <div className="relative h-full overflow-hidden">
-                          <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-1 absolute top-0 left-0" />
+                          <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-2 absolute top-0 left-0" />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-dark-950/70 p-4">
-                        <div>
-                          <div className="text-sm font-black" style={{ color: entry.item.rarity_color }}>{entry.item.skin_name}</div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {entry.item.rarity} • {entry.item.wear_short} • {Number(entry.item.float_value).toFixed(4)}
+                      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-dark-950/70 p-4 gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-24 h-16 rounded-xl bg-black/20 flex items-center justify-center shrink-0 overflow-hidden">
+                            {entry.item.skin_image ? (
+                              <img src={entry.item.skin_image} alt={entry.item.skin_name} className="max-w-[88px] max-h-[52px] object-contain" />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-black truncate" style={{ color: entry.item.rarity_color }}>{entry.item.skin_name}</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {entry.item.rarity} • {entry.item.wear_short} • {Number(entry.item.float_value).toFixed(4)}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 shrink-0">
                           <div className="text-yellow-400 font-black">{entry.item.sell_value} CC</div>
                           <button onClick={() => handleSell(entry.item)} className="rounded-xl bg-yellow-500 px-3 py-2 text-dark-900 font-black text-sm">Vendre</button>
                         </div>
@@ -222,18 +238,20 @@ export default function CaseOpening({ isOpen, onClose }) {
 
       <style>{`
         .case-strip-item {
-          min-width: 96px;
-          max-width: 96px;
-          height: 86px;
+          min-width: ${STRIP_ITEM_WIDTH}px;
+          max-width: ${STRIP_ITEM_WIDTH}px;
+          height: 76px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
+          padding-top: 5px;
           border: 2px solid #555;
           border-radius: 12px;
           background: rgba(255,255,255,0.04);
           flex-shrink: 0;
-          gap: 4px;
+          gap: 2px;
+          overflow: hidden;
         }
       `}</style>
     </>

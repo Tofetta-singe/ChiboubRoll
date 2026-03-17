@@ -71,6 +71,15 @@ export async function sellSkin(token, itemId) {
   return parseResponse(res, 'Echec de la vente');
 }
 
+export async function setShowcaseSkin(token, itemId) {
+  const res = await fetch(`${API_BASE}/api/profile/showcase`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify({ itemId }),
+  });
+  return parseResponse(res, 'Echec mise a jour vitrine');
+}
+
 export async function startCaseBattle(token, caseId) {
   const res = await fetch(`${API_BASE}/api/case-battle/start`, {
     method: 'POST',
