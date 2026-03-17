@@ -17,6 +17,9 @@ db.exec(`
     coins         INTEGER DEFAULT 100,
     total_earned  INTEGER DEFAULT 0,
     total_spins   INTEGER DEFAULT 0,
+    spins_since_power INTEGER DEFAULT 0,
+    spin_streak   INTEGER DEFAULT 0,
+    last_spin_at  TEXT,
     created_at    TEXT DEFAULT (datetime('now')),
     updated_at    TEXT DEFAULT (datetime('now'))
   );
@@ -29,6 +32,11 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 `);
+
+// Migration: add new columns if they don't exist (safe for existing DBs)
+try { db.exec('ALTER TABLE users ADD COLUMN spins_since_power INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN spin_streak INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN last_spin_at TEXT'); } catch {}
 
 // ===== PREPARED STATEMENTS =====
 const stmts = {
@@ -45,8 +53,18 @@ const stmts = {
 
   updateCoins: db.prepare(`
     UPDATE users
-    SET coins = coins + ?, total_earned = total_earned + ?, total_spins = total_spins + 1, updated_at = datetime('now')
+    SET coins = coins + ?, total_earned = total_earned + ?, total_spins = total_spins + 1,
+        spins_since_power = spins_since_power + 1,
+        updated_at = datetime('now')
     WHERE id = ?
+  `),
+
+  resetPowerCounter: db.prepare(`
+    UPDATE users SET spins_since_power = 0 WHERE id = ?
+  `),
+
+  updateStreak: db.prepare(`
+    UPDATE users SET spin_streak = ?, last_spin_at = datetime('now') WHERE id = ?
   `),
 
   setCoins: db.prepare(`
@@ -81,6 +99,14 @@ module.exports = {
   addCoins(userId, amount) {
     stmts.updateCoins.run(amount, Math.max(0, amount), userId);
     return stmts.getUser.get(userId);
+  },
+
+  resetPowerCounter(userId) {
+    stmts.resetPowerCounter.run(userId);
+  },
+
+  updateStreak(userId, streak) {
+    stmts.updateStreak.run(streak, userId);
   },
 
   setCoins(userId, coins) {

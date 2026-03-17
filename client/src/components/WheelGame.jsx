@@ -2,26 +2,26 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { doSpin } from '../lib/api';
 
-// ===== SEGMENT DEFINITIONS (mirrors server) =====
+// ===== SEGMENT DEFINITIONS (mirrors server — BOOSTED x5) =====
 function getSegments(isGolden, megaLevel) {
   let segments = [
-    { value: 1, color: '#4a3580', label: '1' },
-    { value: 2, color: '#5b3d9e', label: '2' },
-    { value: 3, color: '#6d45bc', label: '3' },
-    { value: 5, color: '#7c4ddb', label: '5' },
-    { value: 2, color: '#5540a0', label: '2' },
-    { value: 1, color: '#483278', label: '1' },
-    { value: 10, color: '#f5a623', label: '10' },
-    { value: 3, color: '#6840b5', label: '3' },
-    { value: 1, color: '#4c3685', label: '1' },
-    { value: 5, color: '#7a4bd8', label: '5' },
-    { value: 2, color: '#5a3c9b', label: '2' },
-    { value: 20, color: '#e6941e', label: '20' },
+    { value: 5,   color: '#4a3580', label: '5' },
+    { value: 10,  color: '#5b3d9e', label: '10' },
+    { value: 15,  color: '#6d45bc', label: '15' },
+    { value: 25,  color: '#7c4ddb', label: '25' },
+    { value: 10,  color: '#5540a0', label: '10' },
+    { value: 5,   color: '#483278', label: '5' },
+    { value: 50,  color: '#f5a623', label: '50' },
+    { value: 15,  color: '#6840b5', label: '15' },
+    { value: 5,   color: '#4c3685', label: '5' },
+    { value: 25,  color: '#7a4bd8', label: '25' },
+    { value: 10,  color: '#5a3c9b', label: '10' },
+    { value: 100, color: '#e6941e', label: '100' },
   ];
 
-  if (megaLevel >= 1) { segments[6] = { value: 25, color: '#e88b15', label: '25' }; segments.push({ value: 50, color: '#d4790f', label: '50' }); }
-  if (megaLevel >= 2) { segments.push({ value: 100, color: '#c46a0a', label: '💯' }); }
-  if (megaLevel >= 3) { segments.push({ value: 250, color: '#b35b05', label: '💎250' }); }
+  if (megaLevel >= 1) { segments[6] = { value: 125, color: '#e88b15', label: '125' }; segments.push({ value: 250, color: '#d4790f', label: '250' }); }
+  if (megaLevel >= 2) { segments.push({ value: 500, color: '#c46a0a', label: '500' }); }
+  if (megaLevel >= 3) { segments.push({ value: 1250, color: '#b35b05', label: '💎1250' }); }
 
   if (isGolden) {
     segments = segments.map(s => ({
@@ -40,7 +40,7 @@ function adjustColor(hex, amount) {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-function drawWheel(canvas, segments, rotation = 0) {
+function drawWheel(canvas, segments, rotation = 0, isPowerRoll = false) {
   const ctx = canvas.getContext('2d');
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
@@ -49,10 +49,22 @@ function drawWheel(canvas, segments, rotation = 0) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Power Roll glow
+  if (isPowerRoll) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 18, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 200, 0, 0.8)';
+    ctx.lineWidth = 6;
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 30;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
   // Outer ring
   ctx.beginPath();
   ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(245, 166, 35, 0.5)';
+  ctx.strokeStyle = isPowerRoll ? 'rgba(255, 200, 0, 0.8)' : 'rgba(245, 166, 35, 0.5)';
   ctx.lineWidth = 3;
   ctx.stroke();
 
@@ -67,8 +79,9 @@ function drawWheel(canvas, segments, rotation = 0) {
     ctx.closePath();
 
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, adjustColor(seg.color, 30));
-    grad.addColorStop(1, seg.color);
+    const baseColor = isPowerRoll ? adjustColor(seg.color, 60) : seg.color;
+    grad.addColorStop(0, adjustColor(baseColor, 30));
+    grad.addColorStop(1, baseColor);
     ctx.fillStyle = grad;
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -92,7 +105,7 @@ function drawWheel(canvas, segments, rotation = 0) {
   // Outer ring decoration
   ctx.beginPath();
   ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.strokeStyle = isPowerRoll ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 14;
   ctx.stroke();
 
@@ -102,7 +115,7 @@ function drawWheel(canvas, segments, rotation = 0) {
     ctx.beginPath();
     ctx.moveTo(cx + (r + 1) * Math.cos(angle), cy + (r + 1) * Math.sin(angle));
     ctx.lineTo(cx + (r + 14) * Math.cos(angle), cy + (r + 14) * Math.sin(angle));
-    ctx.strokeStyle = 'rgba(245, 166, 35, 0.7)';
+    ctx.strokeStyle = isPowerRoll ? 'rgba(255, 215, 0, 0.9)' : 'rgba(245, 166, 35, 0.7)';
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -121,6 +134,9 @@ export default function WheelGame() {
   const [spinning, setSpinning] = useState(false);
   const [lastWin, setLastWin] = useState(null);
   const [bigWin, setBigWin] = useState(false);
+  const [specialEvent, setSpecialEvent] = useState(null); // 'power' | 'diamond' | 'jackpot' | null
+  const [comboStreak, setComboStreak] = useState(0);
+  const [powerProgress, setPowerProgress] = useState({ current: 0, threshold: 25 });
   const wheelRefs = useRef([]);
   const rotations = useRef([]);
   const autoSpinRef = useRef(null);
@@ -129,6 +145,7 @@ export default function WheelGame() {
   const hasGolden = (upgrades.golden_wheel || 0) > 0;
   const megaLevel = upgrades.mega_segments || 0;
   const spinDuration = Math.max(1200, 3000 - (upgrades.turbo_spin || 0) * 400);
+  const hasPowerRoll = (upgrades.power_roll || 0) > 0;
 
   // Initialize wheel refs and draw
   useEffect(() => {
@@ -168,15 +185,16 @@ export default function WheelGame() {
     }
   };
 
-  const spawnParticles = () => {
-    const colors = ['#f5a623', '#ffd700', '#7c3aed', '#a78bfa', '#10b981', '#ef4444'];
+  const spawnParticles = (colors) => {
+    const defaultColors = ['#f5a623', '#ffd700', '#7c3aed', '#a78bfa', '#10b981', '#ef4444'];
+    const useColors = colors || defaultColors;
     for (let i = 0; i < 30; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
       p.style.left = Math.random() * 100 + 'vw';
       p.style.top = (60 + Math.random() * 40) + 'vh';
       p.style.width = p.style.height = (4 + Math.random() * 8) + 'px';
-      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.background = useColors[Math.floor(Math.random() * useColors.length)];
       p.style.animationDuration = (2 + Math.random() * 3) + 's';
       p.style.animationDelay = Math.random() * 0.5 + 's';
       document.body.appendChild(p);
@@ -188,10 +206,14 @@ export default function WheelGame() {
     if (spinning) return;
     setSpinning(true);
     setLastWin(null);
+    setSpecialEvent(null);
 
     try {
       // Call server to get results
       const data = await doSpin(token);
+
+      // Check for special events BEFORE animation
+      const isPower = data.isPowerRoll;
 
       // Animate each wheel to land on the server-determined segment
       const animPromises = data.results.map((result, wIdx) => {
@@ -203,7 +225,7 @@ export default function WheelGame() {
           const segments = getSegments(isGolden, megaLevel);
           const segAngle = (2 * Math.PI) / segments.length;
           const targetAngle = -Math.PI / 2 - result.segmentIndex * segAngle - segAngle / 2;
-          const extraSpins = 4 + Math.floor(Math.random() * 3);
+          const extraSpins = isPower ? 6 + Math.floor(Math.random() * 3) : 4 + Math.floor(Math.random() * 3);
           const startRot = rotations.current[wIdx] || 0;
           const deltaRot = extraSpins * 2 * Math.PI + targetAngle - startRot;
 
@@ -218,7 +240,7 @@ export default function WheelGame() {
             const ease = 1 - Math.pow(1 - t, 4);
             const currentRot = startRot + deltaRot * ease;
             rotations.current[wIdx] = currentRot;
-            drawWheel(canvas, segments, currentRot);
+            drawWheel(canvas, segments, currentRot, isPower);
 
             if (t < 1) {
               requestAnimationFrame(animate);
@@ -244,7 +266,30 @@ export default function WheelGame() {
 
       setLastWin(data.totalWin);
       setBigWin(data.totalWin >= 50);
-      if (data.totalWin >= 100) spawnParticles();
+      setComboStreak(data.comboStreak || 0);
+      setPowerProgress({
+        current: data.spinsSincePower || 0,
+        threshold: data.powerRollThreshold || 25,
+      });
+
+      // Special events
+      if (data.isJackpot) {
+        setSpecialEvent('jackpot');
+        spawnParticles(['#ffd700', '#ff6b00', '#ff0000', '#ffaa00']);
+      } else if (data.isPowerRoll) {
+        setSpecialEvent('power');
+        spawnParticles(['#ffd700', '#ff9500', '#ffcc00', '#fff200']);
+      } else if (data.isDiamondRain) {
+        setSpecialEvent('diamond');
+        spawnParticles(['#00bfff', '#00e5ff', '#7df9ff', '#b9f2ff']);
+      } else if (data.totalWin >= 100) {
+        spawnParticles();
+      }
+
+      // Clear special event after 3s
+      if (data.isJackpot || data.isPowerRoll || data.isDiamondRain) {
+        setTimeout(() => setSpecialEvent(null), 3000);
+      }
 
     } catch (err) {
       console.error('Spin error:', err);
@@ -264,6 +309,52 @@ export default function WheelGame() {
 
   return (
     <div className="flex flex-col items-center gap-6 relative z-10">
+
+      {/* Special Event Banner */}
+      {specialEvent && (
+        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl font-black text-2xl text-center animate-pop backdrop-blur-xl border shadow-2xl ${
+          specialEvent === 'jackpot' ? 'bg-red-900/80 text-yellow-300 border-yellow-500/60 shadow-yellow-500/30' :
+          specialEvent === 'power' ? 'bg-amber-900/80 text-yellow-200 border-amber-400/60 shadow-amber-400/30' :
+          'bg-cyan-900/80 text-cyan-200 border-cyan-400/60 shadow-cyan-400/30'
+        }`}>
+          {specialEvent === 'jackpot' && '🎰 JACKPOT x10!! 🎰'}
+          {specialEvent === 'power' && '💥 POWER ROLL! 💥'}
+          {specialEvent === 'diamond' && '💠 PLUIE DE DIAMANTS x2! 💠'}
+        </div>
+      )}
+
+      {/* Power Roll Progress Bar */}
+      {hasPowerRoll && (
+        <div className="w-72 glass rounded-full p-1">
+          <div className="flex items-center gap-2 px-3 py-1">
+            <span className="text-sm">💥</span>
+            <div className="flex-1 h-3 bg-dark-700 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${Math.min(100, (powerProgress.current / powerProgress.threshold) * 100)}%`,
+                  background: powerProgress.current >= powerProgress.threshold - 1
+                    ? 'linear-gradient(90deg, #ffd700, #ff6b00)'
+                    : 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                }}
+              />
+            </div>
+            <span className="text-xs font-bold text-gray-400 min-w-[40px] text-right">
+              {powerProgress.current}/{powerProgress.threshold}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Combo Streak */}
+      {comboStreak > 1 && (
+        <div className="flex items-center gap-2 text-sm font-bold text-orange-400 animate-pulse">
+          <span>🔗</span>
+          <span>Combo x{comboStreak}</span>
+          <span className="text-xs text-orange-400/60">+{((upgrades.combo_streak || 0) * 5 * (comboStreak - 1))}% bonus</span>
+        </div>
+      )}
+
       {/* Wheels */}
       <div className="flex flex-wrap gap-7 justify-center items-center">
         {Array.from({ length: wheelCount }).map((_, i) => {

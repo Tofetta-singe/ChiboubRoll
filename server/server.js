@@ -20,14 +20,22 @@ app.use(express.json());
 
 // ===== UPGRADE DEFINITIONS (server-side validation) =====
 const UPGRADES = {
-  extra_wheel: { baseCost: 100, costScale: 2.5, maxLevel: 3 },
-  turbo_spin: { baseCost: 80, costScale: 1.8, maxLevel: 5 },
-  multiplier: { baseCost: 250, costScale: 3.0, maxLevel: 5 },
-  lucky: { baseCost: 500, costScale: 2.8, maxLevel: 4 },
-  auto_spin: { baseCost: 1000, costScale: 3.5, maxLevel: 3 },
-  golden_wheel: { baseCost: 2500, costScale: 1, maxLevel: 1 },
-  mega_segments: { baseCost: 1500, costScale: 2.5, maxLevel: 3 },
-  coin_magnet: { baseCost: 200, costScale: 1.6, maxLevel: 10 },
+  // ---- Original upgrades ----
+  extra_wheel:    { baseCost: 100,  costScale: 2.5, maxLevel: 3 },
+  turbo_spin:     { baseCost: 80,   costScale: 1.8, maxLevel: 5 },
+  multiplier:     { baseCost: 250,  costScale: 3.0, maxLevel: 5 },
+  lucky:          { baseCost: 500,  costScale: 2.8, maxLevel: 4 },
+  auto_spin:      { baseCost: 1000, costScale: 3.5, maxLevel: 3 },
+  golden_wheel:   { baseCost: 2500, costScale: 1,   maxLevel: 1 },
+  mega_segments:  { baseCost: 1500, costScale: 2.5, maxLevel: 3 },
+  coin_magnet:    { baseCost: 200,  costScale: 1.6, maxLevel: 10 },
+  // ---- NEW upgrades ----
+  power_roll:       { baseCost: 800,  costScale: 2.0, maxLevel: 5 },
+  power_roll_boost: { baseCost: 1500, costScale: 2.5, maxLevel: 5 },
+  power_roll_freq:  { baseCost: 2000, costScale: 2.2, maxLevel: 5 },
+  diamond_rain:     { baseCost: 3000, costScale: 2.0, maxLevel: 5 },
+  combo_streak:     { baseCost: 1200, costScale: 1.8, maxLevel: 10 },
+  jackpot_chance:   { baseCost: 5000, costScale: 3.0, maxLevel: 3 },
 };
 
 function getUpgradeCost(upgradeId, currentLevel) {
@@ -131,7 +139,7 @@ app.post('/api/spin', authMiddleware, (req, res) => {
 
   const upgrades = db.getUpgrades(req.userId);
 
-  // Calculate multipliers from upgrades
+  // ===== Calculate upgrade effects =====
   const multiplierLevel = upgrades.multiplier || 0;
   const coinMultiplier = Math.pow(2, multiplierLevel);
   const magnetLevel = upgrades.coin_magnet || 0;
@@ -141,7 +149,36 @@ app.post('/api/spin', authMiddleware, (req, res) => {
   const hasGolden = (upgrades.golden_wheel || 0) > 0;
   const megaLevel = upgrades.mega_segments || 0;
 
-  // Server-side spin calculation
+  // ===== Power Roll check =====
+  const powerRollLevel = upgrades.power_roll || 0;
+  const powerBoostLevel = upgrades.power_roll_boost || 0;
+  const powerFreqLevel = upgrades.power_roll_freq || 0;
+  const powerRollThreshold = Math.max(10, 25 - powerFreqLevel * 3);
+  const powerRollMultiplier = 5 + powerBoostLevel * 2;
+  // Power Roll triggers when threshold is reached AND user has the upgrade
+  const spinsBeforePower = user.spins_since_power || 0;
+  const isPowerRoll = powerRollLevel > 0 && spinsBeforePower >= (powerRollThreshold - 1);
+
+  // ===== Combo Streak =====
+  const comboLevel = upgrades.combo_streak || 0;
+  const lastSpinTime = user.last_spin_at ? new Date(user.last_spin_at + 'Z').getTime() : 0;
+  const now = Date.now();
+  const streakTimeout = 30000; // 30 seconds
+  let currentStreak = user.spin_streak || 0;
+  if (now - lastSpinTime > streakTimeout) {
+    currentStreak = 0; // Reset streak if inactive too long
+  }
+  const streakBonus = comboLevel > 0 ? 1 + currentStreak * 0.05 * comboLevel : 1;
+
+  // ===== Diamond Rain =====
+  const diamondLevel = upgrades.diamond_rain || 0;
+  const diamondProc = diamondLevel > 0 && Math.random() < diamondLevel * 0.05;
+
+  // ===== Jackpot =====
+  const jackpotLevel = upgrades.jackpot_chance || 0;
+  const jackpotProc = jackpotLevel > 0 && Math.random() < jackpotLevel * 0.02;
+
+  // ===== Server-side spin calculation =====
   let totalWin = 0;
   const results = [];
 
@@ -160,20 +197,55 @@ app.post('/api/spin', authMiddleware, (req, res) => {
     }
 
     const baseValue = segments[winIndex];
-    const earned = Math.floor(baseValue * coinMultiplier * magnetBonus);
+    let earned = Math.floor(baseValue * coinMultiplier * magnetBonus * streakBonus);
+
+    // Power Roll multiplier
+    if (isPowerRoll) {
+      earned = Math.floor(earned * powerRollMultiplier);
+    }
+
     totalWin += earned;
     results.push({ wheelIndex: w, segmentIndex: winIndex, value: earned, isGolden });
   }
 
-  // Update database
+  // Apply Diamond Rain (double total)
+  if (diamondProc) {
+    totalWin = totalWin * 2;
+  }
+
+  // Apply Jackpot (x10 total)
+  if (jackpotProc) {
+    totalWin = totalWin * 10;
+  }
+
+  // ===== Update database =====
   const updatedUser = db.addCoins(req.userId, totalWin);
+
+  // Reset power counter if power roll triggered
+  if (isPowerRoll) {
+    db.resetPowerCounter(req.userId);
+  }
+
+  // Update streak
+  db.updateStreak(req.userId, currentStreak + 1);
+
+  // Fetch fresh user for accurate data
+  const freshUser = db.getUser(req.userId);
 
   res.json({
     results,
     totalWin,
-    coins: updatedUser.coins,
-    totalEarned: updatedUser.total_earned,
-    totalSpins: updatedUser.total_spins,
+    coins: freshUser.coins,
+    totalEarned: freshUser.total_earned,
+    totalSpins: freshUser.total_spins,
+    // Special event flags
+    isPowerRoll,
+    powerRollMultiplier: isPowerRoll ? powerRollMultiplier : null,
+    isDiamondRain: diamondProc,
+    isJackpot: jackpotProc,
+    comboStreak: currentStreak + 1,
+    spinsSincePower: isPowerRoll ? 0 : (freshUser.spins_since_power || 0),
+    powerRollThreshold,
   });
 });
 
@@ -218,13 +290,13 @@ app.get('/api/leaderboard', (req, res) => {
   res.json({ leaderboard });
 });
 
-// ===== SERVER SEGMENT VALUES (mirrors client) =====
+// ===== SERVER SEGMENT VALUES (mirrors client) — BOOSTED x5 =====
 function getServerSegments(isGolden, megaLevel) {
-  let values = [1, 2, 3, 5, 2, 1, 10, 3, 1, 5, 2, 20];
+  let values = [5, 10, 15, 25, 10, 5, 50, 15, 5, 25, 10, 100];
 
-  if (megaLevel >= 1) { values[6] = 25; values.push(50); }
-  if (megaLevel >= 2) { values.push(100); }
-  if (megaLevel >= 3) { values.push(250); }
+  if (megaLevel >= 1) { values[6] = 125; values.push(250); }
+  if (megaLevel >= 2) { values.push(500); }
+  if (megaLevel >= 3) { values.push(1250); }
 
   if (isGolden) {
     values = values.map(v => v * 3);
@@ -242,5 +314,5 @@ process.on('SIGINT', () => {
 // ===== START =====
 app.listen(PORT, () => {
   console.log(`🎰 ChiboubRoll server running on http://localhost:${PORT}`);
-  console.log(`🔗 Discord login: http://localhost:${PORT}/auth/discord`);
+  console.log(`🔗 Discord login: http://localhost:${PORT}/api/auth/discord`);
 });

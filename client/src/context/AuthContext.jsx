@@ -57,8 +57,8 @@ export function AuthProvider({ children }) {
   };
 
   const updateUserData = (userData, upgradesData) => {
-    if (userData) setUser(userData);
-    if (upgradesData) setUpgrades(upgradesData);
+    if (userData) setUser(prev => ({ ...prev, ...userData }));
+    if (upgradesData) setUpgrades(prev => ({ ...prev, ...upgradesData }));
   };
 
   return (

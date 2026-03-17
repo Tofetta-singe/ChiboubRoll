@@ -4,10 +4,12 @@ import LoginButton from './components/LoginButton';
 import Dashboard from './components/Dashboard';
 import WheelGame from './components/WheelGame';
 import Shop from './components/Shop';
+import Leaderboard from './components/Leaderboard';
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
   const [shopOpen, setShopOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   // Loading state
   if (loading) {
@@ -51,8 +53,15 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right: Shop + User */}
+        {/* Right: Leaderboard + Shop + User */}
         <div className="flex items-center gap-3">
+          <button
+            id="btn-leaderboard"
+            onClick={() => setLeaderboardOpen(true)}
+            className="bg-gradient-to-br from-yellow-500 to-amber-600 text-dark-900 font-semibold px-5 py-2.5 rounded-full text-sm hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(245,166,35,0.4)] transition-all"
+          >
+            🏆 Top 10
+          </button>
           <button
             id="btn-shop-toggle"
             onClick={() => setShopOpen(true)}
@@ -77,6 +86,9 @@ export default function App() {
 
       {/* Shop */}
       <Shop isOpen={shopOpen} onClose={() => setShopOpen(false)} />
+
+      {/* Leaderboard */}
+      <Leaderboard isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />
     </div>
   );
 }
