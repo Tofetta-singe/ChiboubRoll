@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3001;
 // ===== CONFIG =====
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'https://chiboubroll.onrender.com/api/user';
-const CLIENT_URL = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app/';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'https://chiboubroll.onrender.com/api/auth/callback';
+const CLIENT_URL = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app';
 
 // ===== MIDDLEWARE =====
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
@@ -41,7 +41,7 @@ function getUpgradeCost(upgradeId, currentLevel) {
 // =========================================
 
 /** Step 1: Redirect user to Discord OAuth2 */
-app.get('/auth/discord', (req, res) => {
+app.get('/api/auth/discord', (req, res) => {
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
@@ -52,7 +52,7 @@ app.get('/auth/discord', (req, res) => {
 });
 
 /** Step 2: Discord callback — exchange code for token, fetch user, upsert DB */
-app.get('/auth/discord/callback', async (req, res) => {
+app.get('/api/auth/callback', async (req, res) => {
   const { code } = req.query;
   if (!code) {
     return res.status(400).json({ error: 'Code manquant' });

@@ -1,4 +1,4 @@
-const API_BASE = '';
+const API_BASE = 'https://chiboubroll.onrender.com';
 
 function getHeaders(token) {
   const h = { 'Content-Type': 'application/json' };

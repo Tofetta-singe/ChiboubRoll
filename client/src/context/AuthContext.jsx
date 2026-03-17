@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
   }, [loadUser]);
 
   const login = () => {
-    window.location.href = '/auth/discord';
+    window.location.href = 'https://chiboubroll.onrender.com/api/auth/discord';
   };
 
   const logout = () => {
