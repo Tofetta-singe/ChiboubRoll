@@ -6,35 +6,35 @@ const UPGRADE_CATEGORIES = [
   {
     title: '🎡 Roue',
     upgrades: [
-      { id: 'extra_wheel',   icon: '🎡', name: 'Roue Supplémentaire', desc: '+1 roue simultanée', baseCost: 150, costScale: 2.8, maxLevel: 10 },
-      { id: 'turbo_spin',    icon: '⚡', name: 'Turbo Spin', desc: 'Vitesse de rotation accélérée', baseCost: 100, costScale: 1.5, maxLevel: 10 },
-      { id: 'golden_wheel',  icon: '👑', name: 'Golden Wheels', desc: 'Rend les roues successives dorées (x3)', baseCost: 5000, costScale: 5.0, maxLevel: 5 },
-      { id: 'mega_segments', icon: '💎', name: 'Méga Segments', desc: 'Ajoute des segments ultra-riches', baseCost: 1500, costScale: 2.5, maxLevel: 10 },
+      { id: 'extra_wheel',   icon: '🎡', name: 'Roue Supplémentaire', desc: '+1 roue simultanée', baseCost: 150, costScale: 2.8, maxLevel: 3 },
+      { id: 'turbo_spin',    icon: '⚡', name: 'Turbo Spin', desc: 'Vitesse de rotation accélérée', baseCost: 100, costScale: 1.5, maxLevel: 3 },
+      { id: 'golden_wheel',  icon: '👑', name: 'Golden Wheels', desc: 'Rend les roues successives dorées (x3)', baseCost: 5000, costScale: 5.0, maxLevel: 2 },
+      { id: 'mega_segments', icon: '💎', name: 'Méga Segments', desc: 'Ajoute des segments ultra-riches', baseCost: 1500, costScale: 2.5, maxLevel: 3 },
     ],
   },
   {
     title: '💰 Gains',
     upgrades: [
-      { id: 'multiplier',    icon: '✖️', name: 'Multiplicateur', desc: 'x1.8 sur TOUS les gains (cumulatif!)', baseCost: 250, costScale: 1.35, maxLevel: 50 },
-      { id: 'coin_magnet',   icon: '🧲', name: 'Coin Magnet', desc: '+10% bonus constant', baseCost: 200, costScale: 1.25, maxLevel: 100 },
-      { id: 'lucky',         icon: '🍀', name: 'Lucky Wheel', desc: 'Force la roue vers les gros segments', baseCost: 500, costScale: 1.8, maxLevel: 15 },
+      { id: 'multiplier',    icon: '✖️', name: 'Multiplicateur', desc: 'x1.8 sur TOUS les gains (cumulatif!)', baseCost: 250, costScale: 1.35, maxLevel: 3 },
+      { id: 'coin_magnet',   icon: '🧲', name: 'Coin Magnet', desc: '+10% bonus constant', baseCost: 200, costScale: 1.25, maxLevel: 3 },
+      { id: 'lucky',         icon: '🍀', name: 'Lucky Wheel', desc: 'Force la roue vers les gros segments', baseCost: 500, costScale: 1.8, maxLevel: 3 },
     ],
   },
   {
     title: '💥 Power Roll',
     upgrades: [
-      { id: 'power_roll',       icon: '💥', name: 'Power Roll', desc: 'Active le roll puissant périodique', baseCost: 2000, costScale: 2.5, maxLevel: 10 },
-      { id: 'power_roll_boost', icon: '🔥', name: 'Power Boost', desc: 'Augmente le multiplicateur du Power Roll', baseCost: 3000, costScale: 2.0, maxLevel: 25 },
-      { id: 'power_roll_freq',  icon: '⏩', name: 'Fréquence Power', desc: 'Réduit le délai entre les Power Rolls', baseCost: 5000, costScale: 1.8, maxLevel: 5 },
+      { id: 'power_roll',       icon: '💥', name: 'Power Roll', desc: 'Active le roll puissant périodique', baseCost: 2000, costScale: 2.5, maxLevel: 3 },
+      { id: 'power_roll_boost', icon: '🔥', name: 'Power Boost', desc: 'Augmente le multiplicateur du Power Roll', baseCost: 3000, costScale: 2.0, maxLevel: 3 },
+      { id: 'power_roll_freq',  icon: '⏩', name: 'Fréquence Power', desc: 'Réduit le délai entre les Power Rolls', baseCost: 5000, costScale: 1.8, maxLevel: 3 },
     ],
   },
   {
     title: '✨ Bonus Spéciaux',
     upgrades: [
-      { id: 'diamond_rain',   icon: '💠', name: 'Pluie de Diamants', desc: 'Chance de doubler le gain final', baseCost: 10000, costScale: 2.2, maxLevel: 10 },
-      { id: 'combo_streak',   icon: '🔗', name: 'Combo Streak', desc: 'Bonus massif pour les spins rapides', baseCost: 1200, costScale: 1.4, maxLevel: 30 },
-      { id: 'jackpot_chance',  icon: '🎰', name: 'Jackpot!', desc: 'Chance rare de multiplier par 10', baseCost: 25000, costScale: 3.5, maxLevel: 5 },
-      { id: 'auto_spin',      icon: '🤖', name: 'Auto-Spin', desc: 'Tourne tout seul, de plus en plus vite', baseCost: 1000, costScale: 2.2, maxLevel: 10 },
+      { id: 'diamond_rain',   icon: '💠', name: 'Pluie de Diamants', desc: 'Chance de doubler le gain final', baseCost: 10000, costScale: 2.2, maxLevel: 3 },
+      { id: 'combo_streak',   icon: '🔗', name: 'Combo Streak', desc: 'Bonus massif pour les spins rapides', baseCost: 1200, costScale: 1.4, maxLevel: 3 },
+      { id: 'jackpot_chance',  icon: '🎰', name: 'Jackpot!', desc: 'Chance rare de multiplier par 10', baseCost: 25000, costScale: 3.5, maxLevel: 3 },
+      { id: 'auto_spin',      icon: '🤖', name: 'Auto-Spin', desc: 'Tourne tout seul, de plus en plus vite', baseCost: 1000, costScale: 2.2, maxLevel: 3 },
     ],
   },
 ];

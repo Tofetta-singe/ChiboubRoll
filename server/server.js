@@ -2,11 +2,140 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const db = require('./db');
 const { authMiddleware, generateToken } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ===== LOAD SKINS DATA =====
+const allSkins = require(path.join(__dirname, '..', 'skins.json'));
+
+// ===== RARITY CONFIG =====
+const RARITY_SELL_VALUES = {
+  'Consumer Grade':    5,
+  'Industrial Grade':  15,
+  'Mil-Spec Grade':    40,
+  'Restricted':        120,
+  'Classified':        350,
+  'Covert':            1000,
+  'Extraordinary':     3500,
+  'Contraband':        15000,
+};
+
+const RARITY_ORDER = [
+  'Consumer Grade', 'Industrial Grade', 'Mil-Spec Grade',
+  'Restricted', 'Classified', 'Covert', 'Extraordinary', 'Contraband'
+];
+
+// Group skins by rarity
+const skinsByRarity = {};
+allSkins.forEach(skin => {
+  const rName = skin.rarity?.name;
+  if (!rName) return;
+  if (!skinsByRarity[rName]) skinsByRarity[rName] = [];
+  skinsByRarity[rName].push(skin);
+});
+
+// ===== CASE DEFINITIONS =====
+const CASES = [
+  {
+    id: 'case_standard',
+    name: 'Caisse Standard',
+    icon: '📦',
+    price: 50,
+    color: '#5e98d9',
+    drops: [
+      { rarity: 'Consumer Grade',   weight: 60 },
+      { rarity: 'Industrial Grade',  weight: 25 },
+      { rarity: 'Mil-Spec Grade',    weight: 10 },
+      { rarity: 'Restricted',        weight: 4 },
+      { rarity: 'Classified',        weight: 1 },
+    ],
+  },
+  {
+    id: 'case_premium',
+    name: 'Caisse Premium',
+    icon: '💎',
+    price: 200,
+    color: '#4b69ff',
+    drops: [
+      { rarity: 'Industrial Grade',  weight: 40 },
+      { rarity: 'Mil-Spec Grade',    weight: 30 },
+      { rarity: 'Restricted',        weight: 20 },
+      { rarity: 'Classified',        weight: 8 },
+      { rarity: 'Covert',            weight: 2 },
+    ],
+  },
+  {
+    id: 'case_elite',
+    name: 'Caisse Élite',
+    icon: '🔥',
+    price: 500,
+    color: '#8847ff',
+    drops: [
+      { rarity: 'Mil-Spec Grade',    weight: 30 },
+      { rarity: 'Restricted',        weight: 35 },
+      { rarity: 'Classified',        weight: 20 },
+      { rarity: 'Covert',            weight: 10 },
+      { rarity: 'Extraordinary',     weight: 5 },
+    ],
+  },
+  {
+    id: 'case_legendary',
+    name: 'Caisse Légendaire',
+    icon: '👑',
+    price: 1500,
+    color: '#d32ce6',
+    drops: [
+      { rarity: 'Restricted',        weight: 20 },
+      { rarity: 'Classified',        weight: 35 },
+      { rarity: 'Covert',            weight: 25 },
+      { rarity: 'Extraordinary',     weight: 15 },
+      { rarity: 'Contraband',        weight: 5 },
+    ],
+  },
+  {
+    id: 'case_gold',
+    name: 'Caisse GOLD',
+    icon: '🌟',
+    price: 5000,
+    color: '#e4ae39',
+    drops: [
+      { rarity: 'Classified',        weight: 15 },
+      { rarity: 'Covert',            weight: 35 },
+      { rarity: 'Extraordinary',     weight: 45 },
+      { rarity: 'Contraband',        weight: 5 },
+    ],
+  },
+];
+
+// Helper: pick a random skin from a case
+function rollSkinFromCase(caseData) {
+  const totalWeight = caseData.drops.reduce((sum, d) => sum + d.weight, 0);
+  let roll = Math.random() * totalWeight;
+  let chosenRarity = caseData.drops[caseData.drops.length - 1].rarity;
+
+  for (const drop of caseData.drops) {
+    roll -= drop.weight;
+    if (roll <= 0) {
+      chosenRarity = drop.rarity;
+      break;
+    }
+  }
+
+  const pool = skinsByRarity[chosenRarity];
+  if (!pool || pool.length === 0) {
+    // Fallback to Mil-Spec if somehow empty
+    const fallback = skinsByRarity['Mil-Spec Grade'] || allSkins;
+    const skin = fallback[Math.floor(Math.random() * fallback.length)];
+    return { skin, rarity: skin.rarity?.name || 'Mil-Spec Grade' };
+  }
+
+  const skin = pool[Math.floor(Math.random() * pool.length)];
+  return { skin, rarity: chosenRarity };
+}
 
 // ===== CONFIG =====
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -20,22 +149,22 @@ app.use(express.json());
 
 // ===== UPGRADE DEFINITIONS (server-side validation) =====
 const UPGRADES = {
-  // ---- Original/Core upgrades ----
-  extra_wheel:      { baseCost: 150,   costScale: 2.8,  maxLevel: 10 },  // Max 11 wheels
-  turbo_spin:       { baseCost: 100,   costScale: 1.5,  maxLevel: 10 },  // Faster
-  multiplier:       { baseCost: 250,   costScale: 1.35, maxLevel: 50 },  // Huge scaling
-  lucky:            { baseCost: 500,   costScale: 1.8,  maxLevel: 15 },
-  auto_spin:        { baseCost: 1000,  costScale: 2.2,  maxLevel: 10 },  // Max speed
-  golden_wheel:     { baseCost: 5000,  costScale: 5.0,  maxLevel: 5 },   // Multiple golden wheels
-  mega_segments:    { baseCost: 1500,  costScale: 2.5,  maxLevel: 10 },  // Richer segments
-  coin_magnet:      { baseCost: 200,   costScale: 1.25, maxLevel: 100 }, // +1000% bonus
-  // ---- Power Roll & Special (Advanced) ----
-  power_roll:       { baseCost: 2000,  costScale: 2.5,  maxLevel: 10 },
-  power_roll_boost: { baseCost: 3000,  costScale: 2.0,  maxLevel: 25 },
-  power_roll_freq:  { baseCost: 5000,  costScale: 1.8,  maxLevel: 5 },   // Down to 10 spins min
-  diamond_rain:     { baseCost: 10000, costScale: 2.2,  maxLevel: 10 },
-  combo_streak:     { baseCost: 1200,  costScale: 1.4,  maxLevel: 30 },
-  jackpot_chance:   { baseCost: 25000, costScale: 3.5,  maxLevel: 5 },
+  // ---- Original/Core upgrades (NERFED: max 3) ----
+  extra_wheel:      { baseCost: 150,   costScale: 2.8,  maxLevel: 3 },
+  turbo_spin:       { baseCost: 100,   costScale: 1.5,  maxLevel: 3 },
+  multiplier:       { baseCost: 250,   costScale: 1.35, maxLevel: 3 },
+  lucky:            { baseCost: 500,   costScale: 1.8,  maxLevel: 3 },
+  auto_spin:        { baseCost: 1000,  costScale: 2.2,  maxLevel: 3 },
+  golden_wheel:     { baseCost: 5000,  costScale: 5.0,  maxLevel: 2 },
+  mega_segments:    { baseCost: 1500,  costScale: 2.5,  maxLevel: 3 },
+  coin_magnet:      { baseCost: 200,   costScale: 1.25, maxLevel: 3 },
+  // ---- Power Roll & Special (NERFED: max 3) ----
+  power_roll:       { baseCost: 2000,  costScale: 2.5,  maxLevel: 3 },
+  power_roll_boost: { baseCost: 3000,  costScale: 2.0,  maxLevel: 3 },
+  power_roll_freq:  { baseCost: 5000,  costScale: 1.8,  maxLevel: 3 },
+  diamond_rain:     { baseCost: 10000, costScale: 2.2,  maxLevel: 3 },
+  combo_streak:     { baseCost: 1200,  costScale: 1.4,  maxLevel: 3 },
+  jackpot_chance:   { baseCost: 25000, costScale: 3.5,  maxLevel: 3 },
 };
 
 function getUpgradeCost(upgradeId, currentLevel) {
@@ -292,19 +421,178 @@ app.get('/api/leaderboard', (req, res) => {
   res.json({ leaderboard });
 });
 
-// ===== SERVER SEGMENT VALUES (mirrors client) — BOOSTED x5 =====
+// =========================================
+//  CASE OPENING ROUTES
+// =========================================
+
+/** GET /api/cases — List all available cases */
+app.get('/api/cases', (req, res) => {
+  const casesForClient = CASES.map(c => ({
+    id: c.id,
+    name: c.name,
+    icon: c.icon,
+    price: c.price,
+    color: c.color,
+    drops: c.drops.map(d => ({
+      rarity: d.rarity,
+      chance: d.weight,
+      sellValue: RARITY_SELL_VALUES[d.rarity] || 0,
+      color: allSkins.find(s => s.rarity?.name === d.rarity)?.rarity?.color || '#fff',
+    })),
+  }));
+  res.json({ cases: casesForClient });
+});
+
+/** POST /api/cases/open — Open a case (server-side RNG) */
+app.post('/api/cases/open', authMiddleware, (req, res) => {
+  const { caseId } = req.body;
+
+  const caseData = CASES.find(c => c.id === caseId);
+  if (!caseData) return res.status(400).json({ error: 'Caisse invalide' });
+
+  const user = db.getUser(req.userId);
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+  if (user.coins < caseData.price) {
+    return res.status(400).json({ error: 'Pas assez de Chiboub Coins!' });
+  }
+
+  // Deduct coins
+  db.setCoins(req.userId, user.coins - caseData.price);
+
+  // Roll a skin
+  const { skin, rarity } = rollSkinFromCase(caseData);
+  const sellValue = RARITY_SELL_VALUES[rarity] || 5;
+
+  // Add to inventory
+  const itemId = db.addInventoryItem(
+    req.userId,
+    skin.id,
+    skin.name,
+    skin.image || '',
+    rarity,
+    sellValue
+  );
+
+  const freshUser = db.getUser(req.userId);
+
+  res.json({
+    item: {
+      id: itemId,
+      skin_id: skin.id,
+      skin_name: skin.name,
+      skin_image: skin.image || '',
+      rarity,
+      rarity_color: skin.rarity?.color || '#fff',
+      sell_value: sellValue,
+    },
+    coins: freshUser.coins,
+  });
+});
+
+/** GET /api/inventory — Get user inventory */
+app.get('/api/inventory', authMiddleware, (req, res) => {
+  const items = db.getInventory(req.userId);
+  // Enrich with rarity color
+  const enriched = items.map(item => ({
+    ...item,
+    rarity_color: allSkins.find(s => s.rarity?.name === item.rarity)?.rarity?.color || '#fff',
+  }));
+  res.json({ inventory: enriched });
+});
+
+/** POST /api/inventory/sell — Sell a skin from inventory */
+app.post('/api/inventory/sell', authMiddleware, (req, res) => {
+  const { itemId } = req.body;
+  if (!itemId) return res.status(400).json({ error: 'itemId manquant' });
+
+  const item = db.getInventoryItem(itemId, req.userId);
+  if (!item) return res.status(404).json({ error: 'Skin non trouvé dans l\'inventaire' });
+
+  const user = db.getUser(req.userId);
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+  // Delete item and add coins
+  db.deleteInventoryItem(itemId, req.userId);
+  db.setCoins(req.userId, user.coins + item.sell_value);
+
+  const freshUser = db.getUser(req.userId);
+  res.json({ coins: freshUser.coins, soldValue: item.sell_value });
+});
+
+// =========================================
+//  CASE BATTLE ROUTE
+// =========================================
+
+/** POST /api/case-battle/start — 1v1 case battle vs bot */
+app.post('/api/case-battle/start', authMiddleware, (req, res) => {
+  const { caseId } = req.body;
+
+  const caseData = CASES.find(c => c.id === caseId);
+  if (!caseData) return res.status(400).json({ error: 'Caisse invalide' });
+
+  const user = db.getUser(req.userId);
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+  if (user.coins < caseData.price) {
+    return res.status(400).json({ error: 'Pas assez de Chiboub Coins!' });
+  }
+
+  // Deduct coins for the battle
+  db.setCoins(req.userId, user.coins - caseData.price);
+
+  // Roll for player and bot
+  const playerRoll = rollSkinFromCase(caseData);
+  const botRoll = rollSkinFromCase(caseData);
+
+  const playerValue = RARITY_SELL_VALUES[playerRoll.rarity] || 0;
+  const botValue = RARITY_SELL_VALUES[botRoll.rarity] || 0;
+
+  // Determine winner (higher sell value wins, tie = player wins)
+  const playerWins = playerValue >= botValue;
+
+  let resultItems = [];
+
+  if (playerWins) {
+    // Player wins: gets both skins
+    const id1 = db.addInventoryItem(req.userId, playerRoll.skin.id, playerRoll.skin.name, playerRoll.skin.image || '', playerRoll.rarity, playerValue);
+    const id2 = db.addInventoryItem(req.userId, botRoll.skin.id, botRoll.skin.name, botRoll.skin.image || '', botRoll.rarity, botValue);
+    resultItems = [id1, id2];
+  }
+  // If player loses, they get nothing (coins already deducted)
+
+  const freshUser = db.getUser(req.userId);
+
+  res.json({
+    playerSkin: {
+      skin_name: playerRoll.skin.name,
+      skin_image: playerRoll.skin.image || '',
+      rarity: playerRoll.rarity,
+      rarity_color: playerRoll.skin.rarity?.color || '#fff',
+      sell_value: playerValue,
+    },
+    botSkin: {
+      skin_name: botRoll.skin.name,
+      skin_image: botRoll.skin.image || '',
+      rarity: botRoll.rarity,
+      rarity_color: botRoll.skin.rarity?.color || '#fff',
+      sell_value: botValue,
+    },
+    playerWins,
+    coins: freshUser.coins,
+  });
+});
+
+// ===== SERVER SEGMENT VALUES (NERFED ÷10) =====
 function getServerSegments(wheelIndex, upgrades) {
   const megaLevel = upgrades.mega_segments || 0;
   const goldenLevel = upgrades.golden_wheel || 0;
   
-  let values = [5, 10, 15, 25, 10, 5, 50, 15, 5, 25, 10, 100];
+  let values = [1, 1, 2, 3, 1, 1, 5, 2, 1, 3, 1, 10];
 
-  if (megaLevel >= 1) { values[6] = 125; values.push(250); }
-  if (megaLevel >= 2) { values.push(500); }
-  if (megaLevel >= 3) { values.push(1000); }
-  if (megaLevel >= 4) { values.push(2500); }
-  if (megaLevel >= 5) { values.push(5000); }
-  if (megaLevel >= 10) { values.push(25000); }
+  if (megaLevel >= 1) { values[6] = 12; values.push(25); }
+  if (megaLevel >= 2) { values.push(50); }
+  if (megaLevel >= 3) { values.push(100); }
 
   // If this wheel index is within the golden range
   if (wheelIndex < goldenLevel) {

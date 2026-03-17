@@ -5,11 +5,17 @@ import Dashboard from './components/Dashboard';
 import WheelGame from './components/WheelGame';
 import Shop from './components/Shop';
 import Leaderboard from './components/Leaderboard';
+import CaseOpening from './components/CaseOpening';
+import Inventory from './components/Inventory';
+import CaseBattle from './components/CaseBattle';
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
   const [shopOpen, setShopOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [casesOpen, setCasesOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [battleOpen, setBattleOpen] = useState(false);
 
   // Loading state
   if (loading) {
@@ -53,27 +59,48 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right: Leaderboard + Shop + User */}
-        <div className="flex items-center gap-3">
+        {/* Right: Nav buttons */}
+        <div className="flex items-center gap-2">
           <button
             id="btn-leaderboard"
             onClick={() => setLeaderboardOpen(true)}
-            className="bg-gradient-to-br from-yellow-500 to-amber-600 text-dark-900 font-semibold px-5 py-2.5 rounded-full text-sm hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(245,166,35,0.4)] transition-all"
+            className="bg-gradient-to-br from-yellow-500 to-amber-600 text-dark-900 font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(245,166,35,0.4)] transition-all"
           >
             🏆 Top 10
           </button>
           <button
             id="btn-shop-toggle"
             onClick={() => setShopOpen(true)}
-            className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-semibold px-5 py-2.5 rounded-full text-sm hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(124,58,237,0.4)] transition-all"
+            className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(124,58,237,0.4)] transition-all"
           >
             🛒 Shop
           </button>
           <button
-            onClick={logout}
-            className="glass rounded-full px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            id="btn-cases"
+            onClick={() => setCasesOpen(true)}
+            className="bg-gradient-to-br from-orange-500 to-red-600 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(239,68,68,0.4)] transition-all"
           >
-            Déconnexion
+            📦 Caisses
+          </button>
+          <button
+            id="btn-inventory"
+            onClick={() => setInventoryOpen(true)}
+            className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(16,185,129,0.4)] transition-all"
+          >
+            🎒 Inventaire
+          </button>
+          <button
+            id="btn-battle"
+            onClick={() => setBattleOpen(true)}
+            className="bg-gradient-to-br from-red-600 to-pink-700 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(239,68,68,0.4)] transition-all"
+          >
+            ⚔️ Battle
+          </button>
+          <button
+            onClick={logout}
+            className="glass rounded-full px-3 py-2 text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            Déco
           </button>
         </div>
       </header>
@@ -84,11 +111,12 @@ export default function App() {
         <WheelGame />
       </main>
 
-      {/* Shop */}
+      {/* Panels */}
       <Shop isOpen={shopOpen} onClose={() => setShopOpen(false)} />
-
-      {/* Leaderboard */}
       <Leaderboard isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />
+      <CaseOpening isOpen={casesOpen} onClose={() => setCasesOpen(false)} />
+      <Inventory isOpen={inventoryOpen} onClose={() => setInventoryOpen(false)} />
+      <CaseBattle isOpen={battleOpen} onClose={() => setBattleOpen(false)} />
     </div>
   );
 }

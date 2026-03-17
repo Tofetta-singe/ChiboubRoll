@@ -31,6 +31,18 @@ db.exec(`
     PRIMARY KEY (user_id, upgrade_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS inventory (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT NOT NULL,
+    skin_id       TEXT NOT NULL,
+    skin_name     TEXT NOT NULL,
+    skin_image    TEXT,
+    rarity        TEXT NOT NULL,
+    sell_value    INTEGER NOT NULL,
+    obtained_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 // Migration: add new columns if they don't exist (safe for existing DBs)
@@ -83,6 +95,18 @@ const stmts = {
     SELECT id, username, avatar, coins, total_earned, total_spins
     FROM users ORDER BY total_earned DESC LIMIT 10
   `),
+
+  // Inventory
+  addInventoryItem: db.prepare(`
+    INSERT INTO inventory (user_id, skin_id, skin_name, skin_image, rarity, sell_value)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `),
+
+  getInventory: db.prepare('SELECT * FROM inventory WHERE user_id = ? ORDER BY obtained_at DESC'),
+
+  getInventoryItem: db.prepare('SELECT * FROM inventory WHERE id = ? AND user_id = ?'),
+
+  deleteInventoryItem: db.prepare('DELETE FROM inventory WHERE id = ? AND user_id = ?'),
 };
 
 // ===== EXPORTED HELPERS =====
@@ -127,6 +151,23 @@ module.exports = {
 
   getLeaderboard() {
     return stmts.getLeaderboard.all();
+  },
+
+  addInventoryItem(userId, skinId, skinName, skinImage, rarity, sellValue) {
+    const info = stmts.addInventoryItem.run(userId, skinId, skinName, skinImage, rarity, sellValue);
+    return info.lastInsertRowid;
+  },
+
+  getInventory(userId) {
+    return stmts.getInventory.all(userId);
+  },
+
+  getInventoryItem(itemId, userId) {
+    return stmts.getInventoryItem.get(itemId, userId);
+  },
+
+  deleteInventoryItem(itemId, userId) {
+    return stmts.deleteInventoryItem.run(itemId, userId);
   },
 
   close() {
