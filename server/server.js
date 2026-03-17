@@ -3,11 +3,18 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 const db = require('./db');
 const { authMiddleware, generateToken } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'chiboub-secret';
+
+// Create HTTP server for Socket.IO
+const server = http.createServer(app);
 
 // ===== LOAD SKINS DATA =====
 const allSkins = require(path.join(__dirname, '..', 'skins.json'));
@@ -40,6 +47,18 @@ allSkins.forEach(skin => {
 
 // ===== CASE DEFINITIONS =====
 const CASES = [
+  {
+    id: 'case_basique',
+    name: 'Caisse Basique',
+    icon: '🎁',
+    price: 25,
+    color: '#b0c3d9',
+    drops: [
+      { rarity: 'Consumer Grade',   weight: 70 },
+      { rarity: 'Industrial Grade',  weight: 25 },
+      { rarity: 'Mil-Spec Grade',    weight: 5 },
+    ],
+  },
   {
     id: 'case_standard',
     name: 'Caisse Standard',
@@ -583,16 +602,16 @@ app.post('/api/case-battle/start', authMiddleware, (req, res) => {
   });
 });
 
-// ===== SERVER SEGMENT VALUES (NERFED ÷10) =====
+// ===== SERVER SEGMENT VALUES (avg ~5 per spin) =====
 function getServerSegments(wheelIndex, upgrades) {
   const megaLevel = upgrades.mega_segments || 0;
   const goldenLevel = upgrades.golden_wheel || 0;
   
-  let values = [1, 1, 2, 3, 1, 1, 5, 2, 1, 3, 1, 10];
+  let values = [2, 3, 3, 5, 3, 2, 8, 3, 2, 5, 3, 15];
 
-  if (megaLevel >= 1) { values[6] = 12; values.push(25); }
-  if (megaLevel >= 2) { values.push(50); }
-  if (megaLevel >= 3) { values.push(100); }
+  if (megaLevel >= 1) { values[6] = 20; values.push(30); }
+  if (megaLevel >= 2) { values.push(60); }
+  if (megaLevel >= 3) { values.push(120); }
 
   // If this wheel index is within the golden range
   if (wheelIndex < goldenLevel) {
@@ -602,14 +621,208 @@ function getServerSegments(wheelIndex, upgrades) {
   return values;
 }
 
+// =========================================
+//  SOCKET.IO — REAL-TIME CASE BATTLE
+// =========================================
+const CLIENT_URL_FOR_IO = process.env.CLIENT_URL || 'https://chiboubroll.vercel.app';
+const io = new Server(server, {
+  cors: { origin: CLIENT_URL_FOR_IO, methods: ['GET', 'POST'], credentials: true },
+});
+
+// In-memory rooms store
+const battleRooms = new Map();
+
+// Auth middleware for socket.io
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Authentication required'));
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.userId = decoded.userId;
+    const user = db.getUser(socket.userId);
+    socket.username = user?.username || 'Joueur';
+    socket.avatar = user?.avatar || '';
+    next();
+  } catch {
+    next(new Error('Invalid token'));
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log(`⚔️ Socket connected: ${socket.username} (${socket.userId})`);
+
+  // Create a battle room
+  socket.on('battle:create', ({ caseId }) => {
+    const caseData = CASES.find(c => c.id === caseId);
+    if (!caseData) return socket.emit('battle:error', { error: 'Caisse invalide' });
+
+    const user = db.getUser(socket.userId);
+    if (!user || user.coins < caseData.price) {
+      return socket.emit('battle:error', { error: 'Pas assez de CC!' });
+    }
+
+    // Deduct coins from creator
+    db.setCoins(socket.userId, user.coins - caseData.price);
+
+    const roomId = 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    const room = {
+      id: roomId,
+      caseId,
+      caseName: caseData.name,
+      caseIcon: caseData.icon,
+      caseColor: caseData.color,
+      price: caseData.price,
+      creator: { id: socket.userId, username: socket.username, avatar: socket.avatar, socketId: socket.id },
+      joiner: null,
+      status: 'waiting', // waiting | rolling | done
+      createdAt: Date.now(),
+    };
+    battleRooms.set(roomId, room);
+    socket.join(roomId);
+
+    socket.emit('battle:created', { roomId, room: sanitizeRoom(room) });
+    // Broadcast updated lobby
+    io.emit('battle:lobby', { rooms: getOpenRooms() });
+
+    const freshUser = db.getUser(socket.userId);
+    socket.emit('battle:coins', { coins: freshUser.coins });
+  });
+
+  // Join a battle room
+  socket.on('battle:join', ({ roomId }) => {
+    const room = battleRooms.get(roomId);
+    if (!room) return socket.emit('battle:error', { error: 'Room introuvable' });
+    if (room.status !== 'waiting') return socket.emit('battle:error', { error: 'Battle d\u00e9j\u00e0 lanc\u00e9e' });
+    if (room.creator.id === socket.userId) return socket.emit('battle:error', { error: 'Tu ne peux pas rejoindre ta propre room' });
+
+    const caseData = CASES.find(c => c.id === room.caseId);
+    if (!caseData) return socket.emit('battle:error', { error: 'Caisse invalide' });
+
+    const user = db.getUser(socket.userId);
+    if (!user || user.coins < caseData.price) {
+      return socket.emit('battle:error', { error: 'Pas assez de CC!' });
+    }
+
+    // Deduct coins from joiner
+    db.setCoins(socket.userId, user.coins - caseData.price);
+
+    room.joiner = { id: socket.userId, username: socket.username, avatar: socket.avatar, socketId: socket.id };
+    room.status = 'rolling';
+    socket.join(roomId);
+
+    const freshUser = db.getUser(socket.userId);
+    socket.emit('battle:coins', { coins: freshUser.coins });
+
+    // Broadcast lobby update
+    io.emit('battle:lobby', { rooms: getOpenRooms() });
+
+    // Notify both players the battle is starting
+    io.to(roomId).emit('battle:start', { room: sanitizeRoom(room) });
+
+    // Roll skins after a delay (simulate animation sync)
+    setTimeout(() => {
+      const creatorRoll = rollSkinFromCase(caseData);
+      const joinerRoll = rollSkinFromCase(caseData);
+
+      const creatorValue = RARITY_SELL_VALUES[creatorRoll.rarity] || 0;
+      const joinerValue = RARITY_SELL_VALUES[joinerRoll.rarity] || 0;
+
+      const creatorWins = creatorValue >= joinerValue;
+      const winnerId = creatorWins ? room.creator.id : room.joiner.id;
+
+      // Award skins to winner
+      db.addInventoryItem(winnerId, creatorRoll.skin.id, creatorRoll.skin.name, creatorRoll.skin.image || '', creatorRoll.rarity, creatorValue);
+      db.addInventoryItem(winnerId, joinerRoll.skin.id, joinerRoll.skin.name, joinerRoll.skin.image || '', joinerRoll.rarity, joinerValue);
+
+      room.status = 'done';
+
+      const result = {
+        creatorSkin: {
+          skin_name: creatorRoll.skin.name,
+          skin_image: creatorRoll.skin.image || '',
+          rarity: creatorRoll.rarity,
+          rarity_color: creatorRoll.skin.rarity?.color || '#fff',
+          sell_value: creatorValue,
+        },
+        joinerSkin: {
+          skin_name: joinerRoll.skin.name,
+          skin_image: joinerRoll.skin.image || '',
+          rarity: joinerRoll.rarity,
+          rarity_color: joinerRoll.skin.rarity?.color || '#fff',
+          sell_value: joinerValue,
+        },
+        winnerId,
+        creatorWins,
+      };
+
+      io.to(roomId).emit('battle:result', result);
+
+      // Clean up room after a bit
+      setTimeout(() => battleRooms.delete(roomId), 30000);
+    }, 4000); // 4s for animation
+  });
+
+  // Request lobby
+  socket.on('battle:getLobby', () => {
+    socket.emit('battle:lobby', { rooms: getOpenRooms() });
+  });
+
+  // Cancel a room (creator only)
+  socket.on('battle:cancel', ({ roomId }) => {
+    const room = battleRooms.get(roomId);
+    if (!room) return;
+    if (room.creator.id !== socket.userId) return;
+    if (room.status !== 'waiting') return;
+
+    // Refund creator
+    const user = db.getUser(socket.userId);
+    if (user) db.setCoins(socket.userId, user.coins + room.price);
+
+    battleRooms.delete(roomId);
+    io.emit('battle:lobby', { rooms: getOpenRooms() });
+    socket.emit('battle:cancelled', { roomId });
+    const freshUser = db.getUser(socket.userId);
+    if (freshUser) socket.emit('battle:coins', { coins: freshUser.coins });
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Socket disconnected: ${socket.username}`);
+  });
+});
+
+function getOpenRooms() {
+  const rooms = [];
+  for (const [id, room] of battleRooms) {
+    if (room.status === 'waiting') {
+      rooms.push(sanitizeRoom(room));
+    }
+  }
+  return rooms;
+}
+
+function sanitizeRoom(room) {
+  return {
+    id: room.id,
+    caseId: room.caseId,
+    caseName: room.caseName,
+    caseIcon: room.caseIcon,
+    caseColor: room.caseColor,
+    price: room.price,
+    creator: { username: room.creator.username, avatar: room.creator.avatar },
+    joiner: room.joiner ? { username: room.joiner.username, avatar: room.joiner.avatar } : null,
+    status: room.status,
+  };
+}
+
 // ===== GRACEFUL SHUTDOWN =====
 process.on('SIGINT', () => {
   db.close();
   process.exit(0);
 });
 
-// ===== START =====
-app.listen(PORT, () => {
+// ===== START (http server for Socket.IO) =====
+server.listen(PORT, () => {
   console.log(`🎰 ChiboubRoll server running on http://localhost:${PORT}`);
   console.log(`🔗 Discord login: http://localhost:${PORT}/api/auth/discord`);
+  console.log(`⚔️ Socket.IO ready for Case Battles`);
 });

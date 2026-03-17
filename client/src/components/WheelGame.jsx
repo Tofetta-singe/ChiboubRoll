@@ -24,23 +24,23 @@ function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
   }
 
   let values = [
-    { base: 1,  color: '#4a3580' },
-    { base: 1,  color: '#5b3d9e' },
-    { base: 2,  color: '#6d45bc' },
-    { base: 3,  color: '#7c4ddb' },
-    { base: 1,  color: '#5540a0' },
-    { base: 1,  color: '#483278' },
-    { base: 5,  color: '#f5a623' },
-    { base: 2,  color: '#6840b5' },
-    { base: 1,  color: '#4c3685' },
-    { base: 3,  color: '#7a4bd8' },
-    { base: 1,  color: '#5a3c9b' },
-    { base: 10, color: '#e6941e' },
+    { base: 2,  color: '#4a3580' },
+    { base: 3,  color: '#5b3d9e' },
+    { base: 3,  color: '#6d45bc' },
+    { base: 5,  color: '#7c4ddb' },
+    { base: 3,  color: '#5540a0' },
+    { base: 2,  color: '#483278' },
+    { base: 8,  color: '#f5a623' },
+    { base: 3,  color: '#6840b5' },
+    { base: 2,  color: '#4c3685' },
+    { base: 5,  color: '#7a4bd8' },
+    { base: 3,  color: '#5a3c9b' },
+    { base: 15, color: '#e6941e' },
   ];
 
-  if (megaLevel >= 1) { values[6].base = 12; values.push({ base: 25, color: '#d4790f' }); }
-  if (megaLevel >= 2) { values.push({ base: 50, color: '#c46a0a' }); }
-  if (megaLevel >= 3) { values.push({ base: 100, color: '#b35b05' }); }
+  if (megaLevel >= 1) { values[6].base = 20; values.push({ base: 30, color: '#d4790f' }); }
+  if (megaLevel >= 2) { values.push({ base: 60, color: '#c46a0a' }); }
+  if (megaLevel >= 3) { values.push({ base: 120, color: '#b35b05' }); }
 
   // Apply Golden Wheel x3
   const isGolden = wheelIndex < goldenLevel;
