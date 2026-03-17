@@ -11,11 +11,7 @@ import CaseBattle from './components/CaseBattle';
 
 export default function App() {
   const { isAuthenticated, loading, user, logout } = useAuth();
-  const [shopOpen, setShopOpen] = useState(false);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  const [casesOpen, setCasesOpen] = useState(false);
-  const [inventoryOpen, setInventoryOpen] = useState(false);
-  const [battleOpen, setBattleOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null); // 'shop', 'leaderboard', 'cases', 'inventory', 'battle', null
 
   // Loading state
   if (loading) {
@@ -63,35 +59,35 @@ export default function App() {
         <div className="flex items-center gap-2">
           <button
             id="btn-leaderboard"
-            onClick={() => setLeaderboardOpen(true)}
+            onClick={() => setActivePanel('leaderboard')}
             className="bg-gradient-to-br from-yellow-500 to-amber-600 text-dark-900 font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(245,166,35,0.4)] transition-all"
           >
             🏆 Top 10
           </button>
           <button
             id="btn-shop-toggle"
-            onClick={() => setShopOpen(true)}
+            onClick={() => setActivePanel('shop')}
             className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(124,58,237,0.4)] transition-all"
           >
             🛒 Shop
           </button>
           <button
             id="btn-cases"
-            onClick={() => setCasesOpen(true)}
+            onClick={() => setActivePanel('cases')}
             className="bg-gradient-to-br from-orange-500 to-red-600 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(239,68,68,0.4)] transition-all"
           >
             📦 Caisses
           </button>
           <button
             id="btn-inventory"
-            onClick={() => setInventoryOpen(true)}
+            onClick={() => setActivePanel('inventory')}
             className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(16,185,129,0.4)] transition-all"
           >
             🎒 Inventaire
           </button>
           <button
             id="btn-battle"
-            onClick={() => setBattleOpen(true)}
+            onClick={() => setActivePanel('battle')}
             className="bg-gradient-to-br from-red-600 to-pink-700 text-white font-semibold px-4 py-2 rounded-full text-xs hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(239,68,68,0.4)] transition-all"
           >
             ⚔️ Battle
@@ -111,12 +107,12 @@ export default function App() {
         <WheelGame />
       </main>
 
-      {/* Panels */}
-      <Shop isOpen={shopOpen} onClose={() => setShopOpen(false)} />
-      <Leaderboard isOpen={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />
-      <CaseOpening isOpen={casesOpen} onClose={() => setCasesOpen(false)} />
-      <Inventory isOpen={inventoryOpen} onClose={() => setInventoryOpen(false)} />
-      <CaseBattle isOpen={battleOpen} onClose={() => setBattleOpen(false)} />
+      {/* Panels (only one active at a time) */}
+      <Shop isOpen={activePanel === 'shop'} onClose={() => setActivePanel(null)} />
+      <Leaderboard isOpen={activePanel === 'leaderboard'} onClose={() => setActivePanel(null)} />
+      <CaseOpening isOpen={activePanel === 'cases'} onClose={() => setActivePanel(null)} />
+      <Inventory isOpen={activePanel === 'inventory'} onClose={() => setActivePanel(null)} />
+      <CaseBattle isOpen={activePanel === 'battle'} onClose={() => setActivePanel(null)} />
     </div>
   );
 }

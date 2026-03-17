@@ -156,6 +156,30 @@ function rollSkinFromCase(caseData) {
   return { skin, rarity: chosenRarity };
 }
 
+// Helper: generate a strip of 40 skins for animation
+function generateStrip(caseData, winningRoll) {
+  const strip = [];
+  for (let i = 0; i < 40; i++) {
+    if (i === 35) {
+      strip.push({
+        skin_name: winningRoll.skin.name,
+        skin_image: winningRoll.skin.image || '',
+        rarity: winningRoll.rarity,
+        rarity_color: winningRoll.skin.rarity?.color || '#fff'
+      });
+    } else {
+      const fakeRoll = rollSkinFromCase(caseData);
+      strip.push({
+        skin_name: fakeRoll.skin.name,
+        skin_image: fakeRoll.skin.image || '',
+        rarity: fakeRoll.rarity,
+        rarity_color: fakeRoll.skin.rarity?.color || '#fff'
+      });
+    }
+  }
+  return strip;
+}
+
 // ===== CONFIG =====
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
@@ -483,6 +507,9 @@ app.post('/api/cases/open', authMiddleware, (req, res) => {
   const { skin, rarity } = rollSkinFromCase(caseData);
   const sellValue = RARITY_SELL_VALUES[rarity] || 5;
 
+  // Generate animation strip
+  const strip = generateStrip(caseData, { skin, rarity });
+
   // Add to inventory
   const itemId = db.addInventoryItem(
     req.userId,
@@ -505,6 +532,7 @@ app.post('/api/cases/open', authMiddleware, (req, res) => {
       rarity_color: skin.rarity?.color || '#fff',
       sell_value: sellValue,
     },
+    strip,
     coins: freshUser.coins,
   });
 });
@@ -652,26 +680,42 @@ io.on('connection', (socket) => {
   console.log(`⚔️ Socket connected: ${socket.username} (${socket.userId})`);
 
   // Create a battle room
-  socket.on('battle:create', ({ caseId }) => {
-    const caseData = CASES.find(c => c.id === caseId);
-    if (!caseData) return socket.emit('battle:error', { error: 'Caisse invalide' });
+  socket.on('battle:create', ({ caseIds }) => {
+    if (!caseIds || !Array.isArray(caseIds) || caseIds.length === 0) {
+      return socket.emit('battle:error', { error: 'Aucune caisse s\u00e9lectionn\u00e9e' });
+    }
+
+    let totalPrice = 0;
+    const casesData = [];
+    for (const cid of caseIds) {
+      const cData = CASES.find(c => c.id === cid);
+      if (!cData) return socket.emit('battle:error', { error: 'Caisse invalide: ' + cid });
+      totalPrice += cData.price;
+      casesData.push(cData);
+    }
 
     const user = db.getUser(socket.userId);
-    if (!user || user.coins < caseData.price) {
-      return socket.emit('battle:error', { error: 'Pas assez de CC!' });
+    if (!user || user.coins < totalPrice) {
+      return socket.emit('battle:error', { error: 'Pas assez de CC pour la totalit\u00e9!' });
     }
 
     // Deduct coins from creator
-    db.setCoins(socket.userId, user.coins - caseData.price);
+    db.setCoins(socket.userId, user.coins - totalPrice);
 
     const roomId = 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+    
+    const rounds = casesData.map(c => ({
+      caseId: c.id,
+      caseName: c.name,
+      caseIcon: c.icon,
+      caseColor: c.color,
+      price: c.price
+    }));
+
     const room = {
       id: roomId,
-      caseId,
-      caseName: caseData.name,
-      caseIcon: caseData.icon,
-      caseColor: caseData.color,
-      price: caseData.price,
+      totalPrice,
+      rounds,
       creator: { id: socket.userId, username: socket.username, avatar: socket.avatar, socketId: socket.id },
       joiner: null,
       status: 'waiting', // waiting | rolling | done
@@ -695,16 +739,13 @@ io.on('connection', (socket) => {
     if (room.status !== 'waiting') return socket.emit('battle:error', { error: 'Battle d\u00e9j\u00e0 lanc\u00e9e' });
     if (room.creator.id === socket.userId) return socket.emit('battle:error', { error: 'Tu ne peux pas rejoindre ta propre room' });
 
-    const caseData = CASES.find(c => c.id === room.caseId);
-    if (!caseData) return socket.emit('battle:error', { error: 'Caisse invalide' });
-
     const user = db.getUser(socket.userId);
-    if (!user || user.coins < caseData.price) {
+    if (!user || user.coins < room.totalPrice) {
       return socket.emit('battle:error', { error: 'Pas assez de CC!' });
     }
 
     // Deduct coins from joiner
-    db.setCoins(socket.userId, user.coins - caseData.price);
+    db.setCoins(socket.userId, user.coins - room.totalPrice);
 
     room.joiner = { id: socket.userId, username: socket.username, avatar: socket.avatar, socketId: socket.id };
     room.status = 'rolling';
@@ -717,49 +758,94 @@ io.on('connection', (socket) => {
     io.emit('battle:lobby', { rooms: getOpenRooms() });
 
     // Notify both players the battle is starting
-    io.to(roomId).emit('battle:start', { room: sanitizeRoom(room) });
+    io.to(roomId).emit('battle:start_all', { room: sanitizeRoom(room) });
 
-    // Roll skins after a delay (simulate animation sync)
-    setTimeout(() => {
-      const creatorRoll = rollSkinFromCase(caseData);
-      const joinerRoll = rollSkinFromCase(caseData);
+    // Run battle loop async
+    const battleLoop = async () => {
+      let creatorTotalValue = 0;
+      let joinerTotalValue = 0;
+      
+      const creatorWinnings = [];
+      const joinerWinnings = [];
 
-      const creatorValue = RARITY_SELL_VALUES[creatorRoll.rarity] || 0;
-      const joinerValue = RARITY_SELL_VALUES[joinerRoll.rarity] || 0;
+      // Initial pause before first round
+      await new Promise(r => setTimeout(r, 1000));
 
-      const creatorWins = creatorValue >= joinerValue;
+      for (let i = 0; i < room.rounds.length; i++) {
+        const roundData = room.rounds[i];
+        const cData = CASES.find(c => c.id === roundData.caseId);
+        
+        const creatorRoll = rollSkinFromCase(cData);
+        const joinerRoll = rollSkinFromCase(cData);
+
+        const creatorStrip = generateStrip(cData, creatorRoll);
+        const joinerStrip = generateStrip(cData, joinerRoll);
+
+        const cValue = RARITY_SELL_VALUES[creatorRoll.rarity] || 0;
+        const jValue = RARITY_SELL_VALUES[joinerRoll.rarity] || 0;
+        
+        creatorTotalValue += cValue;
+        joinerTotalValue += jValue;
+
+        creatorWinnings.push({ skin: creatorRoll.skin, rarity: creatorRoll.rarity, value: cValue });
+        joinerWinnings.push({ skin: joinerRoll.skin, rarity: joinerRoll.rarity, value: jValue });
+        
+        io.to(roomId).emit('battle:round_start', { 
+          roundIndex: i, 
+          creatorStrip, 
+          joinerStrip 
+        });
+
+        // wait for animation to finish: ~4s
+        await new Promise(r => setTimeout(r, 4000));
+        
+        io.to(roomId).emit('battle:round_result', {
+          roundIndex: i,
+          creatorSkin: { 
+            skin_name: creatorRoll.skin.name,
+            skin_image: creatorRoll.skin.image || '',
+            rarity: creatorRoll.rarity,
+            rarity_color: creatorRoll.skin.rarity?.color || '#fff',
+            sell_value: cValue
+          },
+          joinerSkin: { 
+            skin_name: joinerRoll.skin.name,
+            skin_image: joinerRoll.skin.image || '',
+            rarity: joinerRoll.rarity,
+            rarity_color: joinerRoll.skin.rarity?.color || '#fff',
+            sell_value: jValue
+          },
+          creatorRoundWins: cValue >= jValue
+        });
+        
+        // wait before next round
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
+      // Determine overall winner
+      const creatorWins = creatorTotalValue >= joinerTotalValue;
       const winnerId = creatorWins ? room.creator.id : room.joiner.id;
 
-      // Award skins to winner
-      db.addInventoryItem(winnerId, creatorRoll.skin.id, creatorRoll.skin.name, creatorRoll.skin.image || '', creatorRoll.rarity, creatorValue);
-      db.addInventoryItem(winnerId, joinerRoll.skin.id, joinerRoll.skin.name, joinerRoll.skin.image || '', joinerRoll.rarity, joinerValue);
+      // Award ALL skins to winner
+      for (const item of creatorWinnings) {
+        db.addInventoryItem(winnerId, item.skin.id, item.skin.name, item.skin.image || '', item.rarity, item.value);
+      }
+      for (const item of joinerWinnings) {
+        db.addInventoryItem(winnerId, item.skin.id, item.skin.name, item.skin.image || '', item.rarity, item.value);
+      }
 
       room.status = 'done';
-
-      const result = {
-        creatorSkin: {
-          skin_name: creatorRoll.skin.name,
-          skin_image: creatorRoll.skin.image || '',
-          rarity: creatorRoll.rarity,
-          rarity_color: creatorRoll.skin.rarity?.color || '#fff',
-          sell_value: creatorValue,
-        },
-        joinerSkin: {
-          skin_name: joinerRoll.skin.name,
-          skin_image: joinerRoll.skin.image || '',
-          rarity: joinerRoll.rarity,
-          rarity_color: joinerRoll.skin.rarity?.color || '#fff',
-          sell_value: joinerValue,
-        },
+      io.to(roomId).emit('battle:finish', {
+        creatorTotalValue,
+        joinerTotalValue,
         winnerId,
-        creatorWins,
-      };
+        creatorWins
+      });
 
-      io.to(roomId).emit('battle:result', result);
-
-      // Clean up room after a bit
       setTimeout(() => battleRooms.delete(roomId), 30000);
-    }, 4000); // 4s for animation
+    };
+
+    battleLoop().catch(console.error);
   });
 
   // Request lobby
@@ -776,7 +862,7 @@ io.on('connection', (socket) => {
 
     // Refund creator
     const user = db.getUser(socket.userId);
-    if (user) db.setCoins(socket.userId, user.coins + room.price);
+    if (user) db.setCoins(socket.userId, user.coins + room.totalPrice);
 
     battleRooms.delete(roomId);
     io.emit('battle:lobby', { rooms: getOpenRooms() });
@@ -803,11 +889,8 @@ function getOpenRooms() {
 function sanitizeRoom(room) {
   return {
     id: room.id,
-    caseId: room.caseId,
-    caseName: room.caseName,
-    caseIcon: room.caseIcon,
-    caseColor: room.caseColor,
-    price: room.price,
+    totalPrice: room.totalPrice,
+    rounds: room.rounds,
     creator: { username: room.creator.username, avatar: room.creator.avatar },
     joiner: room.joiner ? { username: room.joiner.username, avatar: room.joiner.avatar } : null,
     status: room.status,

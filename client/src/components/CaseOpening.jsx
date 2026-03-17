@@ -38,7 +38,7 @@ export default function CaseOpening({ isOpen, onClose }) {
       updateUserData({ coins: data.coins });
 
       // Animate the strip before showing result
-      await animateStrip(data.item, caseData);
+      await animateStrip(data.item, data.strip);
 
       setResult(data.item);
     } catch (err) {
@@ -49,49 +49,34 @@ export default function CaseOpening({ isOpen, onClose }) {
     }
   };
 
-  const animateStrip = (winItem, caseData) => {
+  const animateStrip = (winItem, serverStrip) => {
     return new Promise((resolve) => {
       const strip = stripRef.current;
-      if (!strip) { resolve(); return; }
+      if (!strip || !serverStrip) { resolve(); return; }
 
-      // Build fake items for the rolling strip
-      const rarityColors = {};
-      caseData.drops.forEach(d => { rarityColors[d.rarity] = d.color; });
-
-      const items = [];
-      for (let i = 0; i < 40; i++) {
-        const rarityPool = caseData.drops;
-        const pick = rarityPool[Math.floor(Math.random() * rarityPool.length)];
-        items.push({
-          rarity: pick.rarity,
-          color: pick.color || '#555',
-          fake: true,
-        });
-      }
-      // Place the winning item at position 35 (near the end)
-      items[35] = {
-        rarity: winItem.rarity,
-        color: winItem.rarity_color || '#fff',
-        name: winItem.skin_name,
-        image: winItem.skin_image,
-        fake: false,
-      };
+      // Use the strip from the server
+      const items = serverStrip.map((s, idx) => ({
+        ...s,
+        fake: idx !== 35
+      }));
 
       // Render strip
       strip.innerHTML = '';
       items.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'case-strip-item';
-        div.style.borderColor = item.color;
-        if (item.image && !item.fake) {
-          div.innerHTML = `<img src="${item.image}" alt="" style="width:60px;height:45px;object-fit:contain;" /><span style="font-size:10px;color:${item.color}">${item.rarity}</span>`;
+        div.style.borderColor = item.rarity_color;
+        
+        // Show real image for all items
+        if (item.skin_image) {
+          div.innerHTML = `<img src="${item.skin_image}" alt="" style="width:70px;height:50px;object-fit:contain;margin-bottom:2px;" /><span style="font-size:9px;color:${item.rarity_color};font-weight:bold;text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px">${item.skin_name}</span>`;
         } else {
-          div.innerHTML = `<div style="width:60px;height:45px;background:${item.color}22;border-radius:6px;display:flex;align-items:center;justify-content:center"><span style="font-size:10px;color:${item.color}">${item.rarity}</span></div>`;
+          div.innerHTML = `<div style="width:70px;height:50px;background:${item.rarity_color}22;border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;"><span style="font-size:10px;color:${item.rarity_color}">${item.rarity}</span></div><span style="font-size:9px;color:${item.rarity_color};font-weight:bold;text-align:center;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px">${item.skin_name}</span>`;
         }
         strip.appendChild(div);
       });
 
-      // The winning item is at index 35, each item is 100px wide
+      // The winning item is at index 35, each item is 100px wide (96px + 4px gap)
       // We want item 35 centered → offset = 35*100 - container_width/2 + 50
       const containerWidth = strip.parentElement?.clientWidth || 380;
       const targetOffset = 35 * 100 - containerWidth / 2 + 50;
@@ -159,7 +144,7 @@ export default function CaseOpening({ isOpen, onClose }) {
               </h3>
 
               {/* Strip container */}
-              <div className="relative overflow-hidden rounded-xl bg-dark-800 h-24 mb-4">
+              <div className="relative overflow-hidden rounded-xl bg-dark-800 h-28 mb-4">
                 {/* Center indicator */}
                 <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10 shadow-[0_0_10px_rgba(245,166,35,0.6)]" />
                 <div className="relative h-full" style={{ overflow: 'hidden' }}>
@@ -276,11 +261,12 @@ export default function CaseOpening({ isOpen, onClose }) {
         .case-strip-item {
           min-width: 96px;
           max-width: 96px;
-          height: 76px;
+          height: 86px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
+          padding-top: 6px;
           border: 2px solid #555;
           border-radius: 8px;
           background: rgba(255,255,255,0.03);
