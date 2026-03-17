@@ -20,22 +20,22 @@ app.use(express.json());
 
 // ===== UPGRADE DEFINITIONS (server-side validation) =====
 const UPGRADES = {
-  // ---- Original upgrades ----
-  extra_wheel:    { baseCost: 100,  costScale: 2.5, maxLevel: 3 },
-  turbo_spin:     { baseCost: 80,   costScale: 1.8, maxLevel: 5 },
-  multiplier:     { baseCost: 250,  costScale: 3.0, maxLevel: 5 },
-  lucky:          { baseCost: 500,  costScale: 2.8, maxLevel: 4 },
-  auto_spin:      { baseCost: 1000, costScale: 3.5, maxLevel: 3 },
-  golden_wheel:   { baseCost: 2500, costScale: 1,   maxLevel: 1 },
-  mega_segments:  { baseCost: 1500, costScale: 2.5, maxLevel: 3 },
-  coin_magnet:    { baseCost: 200,  costScale: 1.6, maxLevel: 10 },
-  // ---- NEW upgrades ----
-  power_roll:       { baseCost: 800,  costScale: 2.0, maxLevel: 5 },
-  power_roll_boost: { baseCost: 1500, costScale: 2.5, maxLevel: 5 },
-  power_roll_freq:  { baseCost: 2000, costScale: 2.2, maxLevel: 5 },
-  diamond_rain:     { baseCost: 3000, costScale: 2.0, maxLevel: 5 },
-  combo_streak:     { baseCost: 1200, costScale: 1.8, maxLevel: 10 },
-  jackpot_chance:   { baseCost: 5000, costScale: 3.0, maxLevel: 3 },
+  // ---- Original/Core upgrades ----
+  extra_wheel:      { baseCost: 150,   costScale: 2.8,  maxLevel: 10 },  // Max 11 wheels
+  turbo_spin:       { baseCost: 100,   costScale: 1.5,  maxLevel: 10 },  // Faster
+  multiplier:       { baseCost: 250,   costScale: 1.35, maxLevel: 50 },  // Huge scaling
+  lucky:            { baseCost: 500,   costScale: 1.8,  maxLevel: 15 },
+  auto_spin:        { baseCost: 1000,  costScale: 2.2,  maxLevel: 10 },  // Max speed
+  golden_wheel:     { baseCost: 5000,  costScale: 5.0,  maxLevel: 5 },   // Multiple golden wheels
+  mega_segments:    { baseCost: 1500,  costScale: 2.5,  maxLevel: 10 },  // Richer segments
+  coin_magnet:      { baseCost: 200,   costScale: 1.25, maxLevel: 100 }, // +1000% bonus
+  // ---- Power Roll & Special (Advanced) ----
+  power_roll:       { baseCost: 2000,  costScale: 2.5,  maxLevel: 10 },
+  power_roll_boost: { baseCost: 3000,  costScale: 2.0,  maxLevel: 25 },
+  power_roll_freq:  { baseCost: 5000,  costScale: 1.8,  maxLevel: 5 },   // Down to 10 spins min
+  diamond_rain:     { baseCost: 10000, costScale: 2.2,  maxLevel: 10 },
+  combo_streak:     { baseCost: 1200,  costScale: 1.4,  maxLevel: 30 },
+  jackpot_chance:   { baseCost: 25000, costScale: 3.5,  maxLevel: 5 },
 };
 
 function getUpgradeCost(upgradeId, currentLevel) {
@@ -141,7 +141,7 @@ app.post('/api/spin', authMiddleware, (req, res) => {
 
   // ===== Calculate upgrade effects =====
   const multiplierLevel = upgrades.multiplier || 0;
-  const coinMultiplier = Math.pow(2, multiplierLevel);
+  const coinMultiplier = Math.pow(1.8, multiplierLevel);
   const magnetLevel = upgrades.coin_magnet || 0;
   const magnetBonus = 1 + magnetLevel * 0.10;
   const wheelCount = 1 + (upgrades.extra_wheel || 0);
@@ -183,8 +183,7 @@ app.post('/api/spin', authMiddleware, (req, res) => {
   const results = [];
 
   for (let w = 0; w < wheelCount; w++) {
-    const isGolden = w === 0 && hasGolden;
-    const segments = getServerSegments(isGolden, megaLevel);
+    const segments = getServerSegments(w, upgrades);
 
     // Lucky selection
     let winIndex;
@@ -291,14 +290,21 @@ app.get('/api/leaderboard', (req, res) => {
 });
 
 // ===== SERVER SEGMENT VALUES (mirrors client) — BOOSTED x5 =====
-function getServerSegments(isGolden, megaLevel) {
+function getServerSegments(wheelIndex, upgrades) {
+  const megaLevel = upgrades.mega_segments || 0;
+  const goldenLevel = upgrades.golden_wheel || 0;
+  
   let values = [5, 10, 15, 25, 10, 5, 50, 15, 5, 25, 10, 100];
 
   if (megaLevel >= 1) { values[6] = 125; values.push(250); }
   if (megaLevel >= 2) { values.push(500); }
-  if (megaLevel >= 3) { values.push(1250); }
+  if (megaLevel >= 3) { values.push(1000); }
+  if (megaLevel >= 4) { values.push(2500); }
+  if (megaLevel >= 5) { values.push(5000); }
+  if (megaLevel >= 10) { values.push(25000); }
 
-  if (isGolden) {
+  // If this wheel index is within the golden range
+  if (wheelIndex < goldenLevel) {
     values = values.map(v => v * 3);
   }
 

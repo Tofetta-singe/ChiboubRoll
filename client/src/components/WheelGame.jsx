@@ -3,33 +3,63 @@ import { useAuth } from '../context/AuthContext';
 import { doSpin } from '../lib/api';
 
 // ===== SEGMENT DEFINITIONS (mirrors server — BOOSTED x5) =====
-function getSegments(isGolden, megaLevel) {
-  let segments = [
-    { value: 5,   color: '#4a3580', label: '5' },
-    { value: 10,  color: '#5b3d9e', label: '10' },
-    { value: 15,  color: '#6d45bc', label: '15' },
-    { value: 25,  color: '#7c4ddb', label: '25' },
-    { value: 10,  color: '#5540a0', label: '10' },
-    { value: 5,   color: '#483278', label: '5' },
-    { value: 50,  color: '#f5a623', label: '50' },
-    { value: 15,  color: '#6840b5', label: '15' },
-    { value: 5,   color: '#4c3685', label: '5' },
-    { value: 25,  color: '#7a4bd8', label: '25' },
-    { value: 10,  color: '#5a3c9b', label: '10' },
-    { value: 100, color: '#e6941e', label: '100' },
+// ===== SEGMENT DEFINITIONS (mirrors server — BOOSTED x5) =====
+function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
+  const megaLevel = activeUpgrades.mega_segments || 0;
+  const multiplierLevel = activeUpgrades.multiplier || 0;
+  const magnetLevel = activeUpgrades.coin_magnet || 0;
+  const goldenLevel = activeUpgrades.golden_wheel || 0;
+  
+  // Calculate the multiplier displayed on the wheel
+  const coinMultiplier = Math.pow(1.8, multiplierLevel);
+  const magnetBonus = 1 + magnetLevel * 0.10;
+  
+  // Base multiplier for this wheel
+  let wheelMultiplier = coinMultiplier * magnetBonus;
+  
+  // Handle Power Roll multiplier (real-time preview)
+  if (isPowerActive) {
+    const powerBoostLevel = activeUpgrades.power_roll_boost || 0;
+    const powerRollMultiplier = 5 + powerBoostLevel * 2;
+    wheelMultiplier *= powerRollMultiplier;
+  }
+
+  let values = [
+    { base: 5,   color: '#4a3580' },
+    { base: 10,  color: '#5b3d9e' },
+    { base: 15,  color: '#6d45bc' },
+    { base: 25,  color: '#7c4ddb' },
+    { base: 10,  color: '#5540a0' },
+    { base: 5,   color: '#483278' },
+    { base: 50,  color: '#f5a623' },
+    { base: 15,  color: '#6840b5' },
+    { base: 5,   color: '#4c3685' },
+    { base: 25,  color: '#7a4bd8' },
+    { base: 10,  color: '#5a3c9b' },
+    { base: 100, color: '#e6941e' },
   ];
 
-  if (megaLevel >= 1) { segments[6] = { value: 125, color: '#e88b15', label: '125' }; segments.push({ value: 250, color: '#d4790f', label: '250' }); }
-  if (megaLevel >= 2) { segments.push({ value: 500, color: '#c46a0a', label: '500' }); }
-  if (megaLevel >= 3) { segments.push({ value: 1250, color: '#b35b05', label: '💎1250' }); }
+  if (megaLevel >= 1) { values[6].base = 125; values.push({ base: 250, color: '#d4790f' }); }
+  if (megaLevel >= 2) { values.push({ base: 500, color: '#c46a0a' }); }
+  if (megaLevel >= 3) { values.push({ base: 1000, color: '#b35b05' }); }
+  if (megaLevel >= 4) { values.push({ base: 2500, color: '#9b4e04' }); }
+  if (megaLevel >= 5) { values.push({ base: 5000, color: '#824103' }); }
+  if (megaLevel >= 10) { values.push({ base: 25000, color: '#683402' }); }
 
+  // Apply Golden Wheel x3
+  const isGolden = wheelIndex < goldenLevel;
   if (isGolden) {
-    segments = segments.map(s => ({
-      ...s, value: s.value * 3, label: String(s.value * 3),
-      color: adjustColor(s.color, 40),
-    }));
+    wheelMultiplier *= 3;
   }
-  return segments;
+
+  return values.map(v => {
+    const finalValue = Math.floor(v.base * wheelMultiplier);
+    return {
+      value: finalValue,
+      label: formatNumber(finalValue),
+      color: isGolden ? adjustColor(v.color, 40) : v.color,
+    };
+  });
 }
 
 function adjustColor(hex, amount) {
@@ -153,11 +183,11 @@ export default function WheelGame() {
       const canvas = wheelRefs.current[i];
       if (!canvas) continue;
       if (!rotations.current[i]) rotations.current[i] = 0;
-      const isGolden = i === 0 && hasGolden;
-      const segments = getSegments(isGolden, megaLevel);
-      drawWheel(canvas, segments, rotations.current[i]);
+      const isPowerPending = powerProgress.current >= (powerProgress.threshold - 1);
+      const segments = getSegments(i, upgrades, isPowerPending);
+      drawWheel(canvas, segments, rotations.current[i], isPowerPending);
     }
-  }, [wheelCount, hasGolden, megaLevel]);
+  }, [wheelCount, upgrades, megaLevel, powerProgress]);
 
   // Auto-spin
   useEffect(() => {
@@ -221,8 +251,7 @@ export default function WheelGame() {
           const canvas = wheelRefs.current[wIdx];
           if (!canvas) { resolve(); return; }
 
-          const isGolden = result.isGolden;
-          const segments = getSegments(isGolden, megaLevel);
+          const segments = getSegments(wIdx, upgrades, isPower);
           const segAngle = (2 * Math.PI) / segments.length;
           const targetAngle = -Math.PI / 2 - result.segmentIndex * segAngle - segAngle / 2;
           const extraSpins = isPower ? 6 + Math.floor(Math.random() * 3) : 4 + Math.floor(Math.random() * 3);
@@ -312,11 +341,10 @@ export default function WheelGame() {
 
       {/* Special Event Banner */}
       {specialEvent && (
-        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl font-black text-2xl text-center animate-pop backdrop-blur-xl border shadow-2xl ${
-          specialEvent === 'jackpot' ? 'bg-red-900/80 text-yellow-300 border-yellow-500/60 shadow-yellow-500/30' :
-          specialEvent === 'power' ? 'bg-amber-900/80 text-yellow-200 border-amber-400/60 shadow-amber-400/30' :
-          'bg-cyan-900/80 text-cyan-200 border-cyan-400/60 shadow-cyan-400/30'
-        }`}>
+        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl font-black text-2xl text-center animate-pop backdrop-blur-xl border shadow-2xl ${specialEvent === 'jackpot' ? 'bg-red-900/80 text-yellow-300 border-yellow-500/60 shadow-yellow-500/30' :
+            specialEvent === 'power' ? 'bg-amber-900/80 text-yellow-200 border-amber-400/60 shadow-amber-400/30' :
+              'bg-cyan-900/80 text-cyan-200 border-cyan-400/60 shadow-cyan-400/30'
+          }`}>
           {specialEvent === 'jackpot' && '🎰 JACKPOT x10!! 🎰'}
           {specialEvent === 'power' && '💥 POWER ROLL! 💥'}
           {specialEvent === 'diamond' && '💠 PLUIE DE DIAMANTS x2! 💠'}
@@ -394,9 +422,8 @@ export default function WheelGame() {
       {/* Last win */}
       {lastWin !== null && (
         <div
-          className={`font-bold text-yellow-400 drop-shadow-[0_0_15px_rgba(245,166,35,0.4)] transition-all ${
-            bigWin ? 'text-2xl animate-pop' : 'text-lg'
-          }`}
+          className={`font-bold text-yellow-400 drop-shadow-[0_0_15px_rgba(245,166,35,0.4)] transition-all ${bigWin ? 'text-2xl animate-pop' : 'text-lg'
+            }`}
         >
           +{formatNumber(lastWin)} Chiboub Coins! 🪙
         </div>
