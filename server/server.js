@@ -17,14 +17,14 @@ const server = http.createServer(app);
 const allSkins = require(path.join(__dirname, '..', 'skins.json'));
 
 const RARITY_SELL_VALUES = {
-  'Consumer Grade': 5,
-  'Industrial Grade': 15,
-  'Mil-Spec Grade': 40,
-  Restricted: 240,
-  Classified: 900,
-  Covert: 3500,
-  Extraordinary: 12000,
-  Contraband: 50000,
+  'Consumer Grade': 10,
+  'Industrial Grade': 28,
+  'Mil-Spec Grade': 72,
+  Restricted: 340,
+  Classified: 1250,
+  Covert: 4800,
+  Extraordinary: 16500,
+  Contraband: 68000,
 };
 
 const RARITY_ORDER = [
@@ -41,11 +41,11 @@ const RARITY_ORDER = [
 const FEED_MIN_RARITY = 'Covert';
 
 const WEAR_TIERS = [
-  { short: 'FN', name: 'Factory New', min: 0.0, max: 0.07, multiplier: 2.5 },
-  { short: 'MW', name: 'Minimal Wear', min: 0.07, max: 0.15, multiplier: 1.5 },
-  { short: 'FT', name: 'Field-Tested', min: 0.15, max: 0.38, multiplier: 1.0 },
-  { short: 'WW', name: 'Well-Worn', min: 0.38, max: 0.45, multiplier: 0.8 },
-  { short: 'BS', name: 'Battle-Scarred', min: 0.45, max: 1.01, multiplier: 0.5 },
+  { short: 'FN', name: 'Factory New', min: 0.0, max: 0.07, multiplier: 2.7 },
+  { short: 'MW', name: 'Minimal Wear', min: 0.07, max: 0.15, multiplier: 1.75 },
+  { short: 'FT', name: 'Field-Tested', min: 0.15, max: 0.38, multiplier: 1.15 },
+  { short: 'WW', name: 'Well-Worn', min: 0.38, max: 0.45, multiplier: 0.92 },
+  { short: 'BS', name: 'Battle-Scarred', min: 0.45, max: 1.01, multiplier: 0.72 },
 ];
 
 const FREE_CASE_COOLDOWN_MS = 20_000;

@@ -26,6 +26,7 @@ export default function CaseOpening({ isOpen, onClose }) {
   const [amount, setAmount] = useState(1);
   const [opening, setOpening] = useState(false);
   const [results, setResults] = useState([]);
+  const [revealedItemIds, setRevealedItemIds] = useState([]);
   const [toast, setToast] = useState(null);
   const [sellingIds, setSellingIds] = useState([]);
   const [sellingAll, setSellingAll] = useState(false);
@@ -35,6 +36,7 @@ export default function CaseOpening({ isOpen, onClose }) {
   const basicRevealAudioRef = useRef(null);
   const legendaryRevealAudioRef = useRef(null);
   const revealTimeoutsRef = useRef([]);
+  const scrollRateTimerRef = useRef(null);
 
   useEffect(() => {
     setSfxVolume(readStoredVolume());
@@ -107,19 +109,41 @@ export default function CaseOpening({ isOpen, onClose }) {
     revealTimeoutsRef.current = [];
   };
 
-  const stopAllAudio = () => {
-    clearRevealTimeouts();
-    if (scrollAudioRef.current) {
-      scrollAudioRef.current.pause();
-      scrollAudioRef.current.currentTime = 0;
+  const clearScrollRateTimer = () => {
+    if (scrollRateTimerRef.current) {
+      clearInterval(scrollRateTimerRef.current);
+      scrollRateTimerRef.current = null;
     }
   };
 
-  const playScrollLoop = async () => {
+  const stopAllAudio = () => {
+    clearRevealTimeouts();
+    clearScrollRateTimer();
+    if (scrollAudioRef.current) {
+      scrollAudioRef.current.pause();
+      scrollAudioRef.current.currentTime = 0;
+      scrollAudioRef.current.playbackRate = 1;
+    }
+  };
+
+  const playScrollLoop = async (durationMs) => {
     const audio = scrollAudioRef.current;
     if (!audio) return;
     applyAudioVolumes(sfxVolume);
     audio.currentTime = 0;
+    audio.playbackRate = 1.85;
+    clearScrollRateTimer();
+    const startTime = Date.now();
+    scrollRateTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+      const eased = 1 - (1 - progress) * (1 - progress);
+      audio.playbackRate = 1.85 - eased * 1.15;
+      if (progress >= 1) {
+        audio.playbackRate = 0.7;
+        clearScrollRateTimer();
+      }
+    }, 60);
     try {
       await audio.play();
     } catch {
@@ -148,6 +172,7 @@ export default function CaseOpening({ isOpen, onClose }) {
 
   const resetOpeningState = () => {
     setResults([]);
+    setRevealedItemIds([]);
     setSelectedCase(null);
     setSellingIds([]);
     setSellingAll(false);
@@ -172,6 +197,7 @@ export default function CaseOpening({ isOpen, onClose }) {
     setSelectedCase(caseData);
     setOpening(true);
     setResults([]);
+    setRevealedItemIds([]);
     setSellingIds([]);
 
     try {
@@ -191,7 +217,8 @@ export default function CaseOpening({ isOpen, onClose }) {
   };
 
   const animateStrips = async (items) => {
-    await playScrollLoop();
+    const maxDuration = 3900 + Math.max(0, items.length - 1) * 150;
+    await playScrollLoop(maxDuration);
     await Promise.all(
       items.map((entry, index) => new Promise((resolve) => {
         const strip = stripRefs.current[index];
@@ -230,14 +257,19 @@ export default function CaseOpening({ isOpen, onClose }) {
           });
         });
 
-        setTimeout(resolve, 3900 + index * 150);
+        setTimeout(() => {
+          setRevealedItemIds((prev) => (prev.includes(entry.item.id) ? prev : [...prev, entry.item.id]));
+          resolve();
+        }, 3900 + index * 150);
       }))
     );
 
     if (scrollAudioRef.current) {
       scrollAudioRef.current.pause();
       scrollAudioRef.current.currentTime = 0;
+      scrollAudioRef.current.playbackRate = 1;
     }
+    clearScrollRateTimer();
   };
 
   const handleSell = async (item) => {
@@ -249,6 +281,7 @@ export default function CaseOpening({ isOpen, onClose }) {
       updateUserData({ coins: data.coins });
       const nextResults = results.filter((entry) => entry.item.id !== item.id);
       setResults(nextResults);
+      setRevealedItemIds((prev) => prev.filter((id) => id !== item.id));
       showToast(`Skin vendue: +${data.soldValue} CC`, 'success');
       if (nextResults.length === 0) {
         setTimeout(() => resetOpeningState(), 250);
@@ -385,40 +418,50 @@ export default function CaseOpening({ isOpen, onClose }) {
 
                   {results.map((entry, index) => {
                     const isSelling = sellingIds.includes(entry.item.id);
+                    const isRevealed = revealedItemIds.includes(entry.item.id);
                     return (
-                      <div key={entry.item.id} className={`rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition-opacity ${isSelling ? 'opacity-60' : ''}`}>
-                        <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-36 mb-4">
+                      <div key={entry.item.id} className={`rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition-all ${isSelling ? 'opacity-60' : ''} ${isRevealed ? 'case-reveal-card' : ''}`}>
+                        <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-36 mb-4 case-strip-shell">
                           <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-dark-950 to-transparent z-[11]" />
                           <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-dark-950 to-transparent z-[11]" />
-                          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10" />
+                          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10 case-center-beam" />
+                          <div className="absolute inset-0 case-strip-shine pointer-events-none z-[9]" />
                           <div className="relative h-full overflow-hidden">
                             <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-[10px] absolute top-0 left-0" />
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-dark-950/70 p-4 gap-4">
+                        <div className={`flex items-center justify-between rounded-2xl border p-4 gap-4 transition-all ${isRevealed ? 'border-white/15 bg-dark-950/85 shadow-[0_0_35px_rgba(250,204,21,0.12)]' : 'border-white/10 bg-dark-950/70'}`}>
                           <div className="flex items-center gap-4 min-w-0">
-                            <div className="w-24 h-16 rounded-xl bg-black/20 flex items-center justify-center shrink-0 overflow-hidden">
-                              {entry.item.skin_image ? (
+                            <div className={`w-24 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden transition-all ${isRevealed ? 'bg-black/30' : 'bg-white/5 animate-pulse'}`}>
+                              {isRevealed && entry.item.skin_image ? (
                                 <img src={entry.item.skin_image} alt={entry.item.skin_name} className="max-w-[88px] max-h-[52px] object-contain" />
-                              ) : null}
+                              ) : (
+                                <div className="h-8 w-16 rounded-lg bg-white/10" />
+                              )}
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-black truncate" style={{ color: entry.item.rarity_color }}>{entry.item.skin_name}</div>
+                              <div className="text-sm font-black truncate" style={{ color: isRevealed ? entry.item.rarity_color : '#e2e8f0' }}>
+                                {isRevealed ? entry.item.skin_name : 'Skin en reveal...'}
+                              </div>
                               <div className="text-xs text-gray-400 mt-1">
-                                {entry.item.rarity} • {entry.item.wear_short} • {Number(entry.item.float_value).toFixed(4)}
+                                {isRevealed ? `${entry.item.rarity} • ${entry.item.wear_short} • ${Number(entry.item.float_value).toFixed(4)}` : 'Le resultat reste masque jusqu a la fin du spin'}
                               </div>
-                              <div className={`mt-2 text-[11px] font-bold ${isLegendaryItem(entry.item) ? 'text-amber-300' : 'text-cyan-300'}`}>
-                                {isLegendaryItem(entry.item) ? 'Reveal legendary' : 'Reveal standard'}
-                              </div>
+                              {isRevealed && (
+                                <div className={`mt-2 text-[11px] font-bold ${isLegendaryItem(entry.item) ? 'text-amber-300' : 'text-cyan-300'}`}>
+                                  {isLegendaryItem(entry.item) ? 'Reveal legendary' : 'Reveal standard'}
+                                </div>
+                              )}
                               {isSelling && <div className="text-[11px] font-bold text-amber-300 mt-2">Vente en cours...</div>}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            <div className="text-yellow-400 font-black">{entry.item.sell_value} CC</div>
+                            <div className={`font-black ${isRevealed ? 'text-yellow-400' : 'text-gray-500'}`}>
+                              {isRevealed ? `${entry.item.sell_value} CC` : '???'}
+                            </div>
                             <button
                               onClick={() => handleSell(entry.item)}
-                              disabled={isSelling || sellingAll || opening}
+                              disabled={isSelling || sellingAll || opening || !isRevealed}
                               className="rounded-xl bg-yellow-500 px-3 py-2 text-dark-900 font-black text-sm disabled:opacity-50"
                             >
                               {isSelling ? 'Vente...' : 'Vendre'}
@@ -461,6 +504,48 @@ export default function CaseOpening({ isOpen, onClose }) {
           flex-shrink: 0;
           gap: 4px;
           overflow: hidden;
+        }
+
+        .case-strip-shell::after {
+          content: '';
+          position: absolute;
+          inset: 10px;
+          border-radius: 18px;
+          border: 1px solid rgba(255,255,255,0.06);
+          box-shadow: inset 0 0 30px rgba(255,255,255,0.04);
+          pointer-events: none;
+        }
+
+        .case-center-beam {
+          box-shadow: 0 0 18px rgba(250, 204, 21, 0.9);
+          animation: case-beam-pulse 0.8s ease-in-out infinite alternate;
+        }
+
+        .case-strip-shine {
+          background: linear-gradient(105deg, transparent 0%, transparent 38%, rgba(255,255,255,0.12) 50%, transparent 62%, transparent 100%);
+          transform: translateX(-120%);
+          animation: case-shine 1.7s linear infinite;
+          opacity: 0.6;
+        }
+
+        .case-reveal-card {
+          animation: case-card-reveal 0.38s ease-out;
+        }
+
+        @keyframes case-beam-pulse {
+          from { opacity: 0.65; transform: translateX(-50%) scaleY(0.94); }
+          to { opacity: 1; transform: translateX(-50%) scaleY(1.03); }
+        }
+
+        @keyframes case-shine {
+          from { transform: translateX(-120%); }
+          to { transform: translateX(120%); }
+        }
+
+        @keyframes case-card-reveal {
+          0% { transform: translateY(8px) scale(0.985); opacity: 0.7; }
+          55% { transform: translateY(0) scale(1.01); opacity: 1; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
         }
       `}</style>
     </>
