@@ -59,6 +59,15 @@ db.exec(`
     PRIMARY KEY (user_id, tier_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS admin_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_user_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_user_id TEXT,
+    details TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 try { db.exec('ALTER TABLE users ADD COLUMN spins_since_power INTEGER DEFAULT 0'); } catch { }
@@ -166,6 +175,25 @@ const stmts = {
     FROM users
     ORDER BY total_earned DESC
     LIMIT 10
+  `),
+
+  searchUsers: db.prepare(`
+    SELECT id, username, avatar, coins, total_earned, total_spins
+    FROM users
+    WHERE id = ? OR username LIKE ?
+    ORDER BY total_earned DESC, username ASC
+    LIMIT 20
+  `),
+
+  addAdminLog: db.prepare(`
+    INSERT INTO admin_logs (admin_user_id, action, target_user_id, details)
+    VALUES (?, ?, ?, ?)
+  `),
+
+  getAdminLogs: db.prepare(`
+    SELECT * FROM admin_logs
+    ORDER BY id DESC
+    LIMIT 50
   `),
 
   addInventoryItem: db.prepare(`
@@ -299,6 +327,19 @@ module.exports = {
 
   getLeaderboard() {
     return stmts.getLeaderboard.all();
+  },
+
+  searchUsers(query) {
+    const safeQuery = String(query || '').trim();
+    return stmts.searchUsers.all(safeQuery, `%${safeQuery}%`);
+  },
+
+  addAdminLog(adminUserId, action, targetUserId, details) {
+    stmts.addAdminLog.run(adminUserId, action, targetUserId || null, details || null);
+  },
+
+  getAdminLogs() {
+    return stmts.getAdminLogs.all();
   },
 
   addInventoryItem(userId, item) {

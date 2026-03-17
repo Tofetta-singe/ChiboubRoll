@@ -50,6 +50,7 @@ const WEAR_TIERS = [
 
 const FREE_CASE_COOLDOWN_MS = 20_000;
 const LIVE_FEED_LIMIT = 25;
+const ADMIN_DISCORD_ID = '690562240759464027';
 
 const skinsByRarity = {};
 allSkins.forEach((skin) => {
@@ -498,6 +499,13 @@ function getUserPublic(userId) {
   return { id: user.id, username: user.username, avatar: user.avatar };
 }
 
+function requireAdmin(req, res, next) {
+  if (req.userId !== ADMIN_DISCORD_ID) {
+    return res.status(403).json({ error: 'Acces admin refuse' });
+  }
+  next();
+}
+
 app.get('/api/auth/discord', (req, res) => {
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
@@ -831,6 +839,52 @@ app.post('/api/battlepass/claim', authMiddleware, (req, res) => {
     battlepass: serializeBattlepass(req.userId),
     reward: rewardBattlepass(req.userId, tier),
   });
+});
+
+app.get('/api/admin/bootstrap', authMiddleware, requireAdmin, (req, res) => {
+  res.json({
+    adminUserId: ADMIN_DISCORD_ID,
+    logs: db.getAdminLogs(),
+  });
+});
+
+app.get('/api/admin/users', authMiddleware, requireAdmin, (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query || query.length < 2) {
+    return res.status(400).json({ error: 'Recherche trop courte' });
+  }
+
+  res.json({ users: db.searchUsers(query) });
+});
+
+app.post('/api/admin/coins', authMiddleware, requireAdmin, (req, res) => {
+  const { targetUserId, mode, amount } = req.body || {};
+  const numericAmount = Number(amount);
+
+  if (!targetUserId || !['add', 'remove', 'set'].includes(mode) || !Number.isFinite(numericAmount)) {
+    return res.status(400).json({ error: 'Payload admin invalide' });
+  }
+
+  if (!Number.isInteger(numericAmount) || Math.abs(numericAmount) > 1_000_000_000) {
+    return res.status(400).json({ error: 'Montant refuse' });
+  }
+
+  const targetUser = db.getUser(String(targetUserId));
+  if (!targetUser) return res.status(404).json({ error: 'Utilisateur cible introuvable' });
+
+  let nextCoins = targetUser.coins;
+  if (mode === 'add') nextCoins = targetUser.coins + Math.max(0, numericAmount);
+  if (mode === 'remove') nextCoins = Math.max(0, targetUser.coins - Math.max(0, numericAmount));
+  if (mode === 'set') nextCoins = Math.max(0, numericAmount);
+
+  const updatedUser = db.setCoins(targetUser.id, nextCoins);
+  db.addAdminLog(req.userId, `coins:${mode}`, targetUser.id, JSON.stringify({
+    previousCoins: targetUser.coins,
+    nextCoins,
+    amount: numericAmount,
+  }));
+
+  res.json({ user: updatedUser, logs: db.getAdminLogs() });
 });
 
 const io = new Server(server, {

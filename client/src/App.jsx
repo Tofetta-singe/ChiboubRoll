@@ -13,6 +13,10 @@ import CaseBattle from './components/CaseBattle';
 import Battlepass from './components/Battlepass';
 import LiveDropFeed from './components/LiveDropFeed';
 import TradePanel from './components/TradePanel';
+import AdminPanel from './components/AdminPanel';
+import SettingsPanel from './components/SettingsPanel';
+
+const ADMIN_DISCORD_ID = '690562240759464027';
 
 export default function App() {
   const { isAuthenticated, loading, user, token, logout, loadUser } = useAuth();
@@ -62,16 +66,14 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="text-5xl animate-bounce">🎰</div>
+          <div className="text-5xl animate-bounce">Chiboub</div>
           <p className="text-gray-500 font-semibold">Chargement de ChiboubRoll...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <LoginButton />;
-  }
+  if (!isAuthenticated) return <LoginButton />;
 
   return (
     <div className="min-h-screen relative">
@@ -87,16 +89,16 @@ export default function App() {
 
       <header className="fixed top-0 left-0 right-0 h-20 flex items-center justify-between px-6 bg-dark-900/85 backdrop-blur-xl border-b border-white/10 z-[100]">
         <h1 className="text-xl font-extrabold bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-600 bg-clip-text text-transparent">
-          🪙 ChiboubRoll
+          ChiboubRoll
         </h1>
 
         <div className="flex flex-col items-center gap-1">
           <div className="flex items-center gap-2 glass rounded-full px-6 py-2">
-            <span className="text-xl">🪙</span>
+            <span className="text-xl">CC</span>
             <span className="text-xl font-extrabold text-yellow-400 min-w-[50px] text-center">
               {formatNumber(user?.coins || 0)}
             </span>
-            <span className="text-sm font-semibold text-yellow-500/70">CC</span>
+            <span className="text-sm font-semibold text-yellow-500/70">coins</span>
           </div>
           <div className="flex gap-4 text-[0.65rem] text-gray-600">
             <span>{formatNumber(user?.total_spins || 0)} spins</span>
@@ -106,23 +108,31 @@ export default function App() {
 
         <div className="flex items-center gap-2">
           <button onClick={() => setActivePanel('leaderboard')} className="bg-gradient-to-br from-yellow-500 to-amber-600 text-dark-900 font-semibold px-4 py-2 rounded-full text-xs">
-            🏆 Top 10
+            Top 10
           </button>
           <button onClick={() => setActivePanel('shop')} className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-semibold px-4 py-2 rounded-full text-xs">
-            🛒 Shop
+            Shop
           </button>
           <button onClick={() => setActivePanel('cases')} className="bg-gradient-to-br from-orange-500 to-red-600 text-white font-semibold px-4 py-2 rounded-full text-xs">
-            📦 Caisses
+            Caisses
           </button>
           <button onClick={() => setActivePanel('inventory')} className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-semibold px-4 py-2 rounded-full text-xs">
-            🎒 Inventaire
+            Inventaire
           </button>
           <button onClick={() => setActivePanel('battlepass')} className="bg-gradient-to-br from-cyan-500 to-sky-700 text-white font-semibold px-4 py-2 rounded-full text-xs">
-            🚀 Battlepass
+            Battlepass
           </button>
           <button onClick={() => setActivePanel('battle')} className="bg-gradient-to-br from-red-600 to-pink-700 text-white font-semibold px-4 py-2 rounded-full text-xs">
-            ⚔️ Battle
+            Battle
           </button>
+          <button onClick={() => setActivePanel('settings')} className="bg-gradient-to-br from-slate-600 to-slate-800 text-white font-semibold px-4 py-2 rounded-full text-xs">
+            Settings
+          </button>
+          {user?.id === ADMIN_DISCORD_ID && (
+            <button onClick={() => setActivePanel('admin')} className="bg-gradient-to-br from-red-700 to-orange-600 text-white font-semibold px-4 py-2 rounded-full text-xs">
+              Admin
+            </button>
+          )}
           <button onClick={logout} className="glass rounded-full px-3 py-2 text-xs text-gray-400 hover:text-white transition-colors">
             Deco
           </button>
@@ -148,6 +158,8 @@ export default function App() {
       <Inventory isOpen={activePanel === 'inventory'} onClose={() => setActivePanel(null)} />
       <Battlepass isOpen={activePanel === 'battlepass'} onClose={() => setActivePanel(null)} />
       <CaseBattle isOpen={activePanel === 'battle'} onClose={() => setActivePanel(null)} socket={socket} />
+      <SettingsPanel isOpen={activePanel === 'settings'} onClose={() => setActivePanel(null)} />
+      <AdminPanel isOpen={activePanel === 'admin'} onClose={() => setActivePanel(null)} />
 
       <TradePanel
         socket={socket}

@@ -113,3 +113,26 @@ export async function claimBattlepassTier(token, tierId) {
   });
   return parseResponse(res, 'Echec du claim battlepass');
 }
+
+export async function fetchAdminBootstrap(token) {
+  const res = await fetch(`${API_BASE}/api/admin/bootstrap`, {
+    headers: getHeaders(token),
+  });
+  return parseResponse(res, 'Failed to load admin panel');
+}
+
+export async function searchAdminUsers(token, query) {
+  const res = await fetch(`${API_BASE}/api/admin/users?q=${encodeURIComponent(query)}`, {
+    headers: getHeaders(token),
+  });
+  return parseResponse(res, 'Failed to search users');
+}
+
+export async function adminUpdateCoins(token, payload) {
+  const res = await fetch(`${API_BASE}/api/admin/coins`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(res, 'Failed to update coins');
+}
