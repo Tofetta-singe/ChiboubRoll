@@ -100,7 +100,7 @@ app.get('/api/auth/callback', async (req, res) => {
     const jwt = generateToken(discordUser.id);
 
     // Redirect to frontend with token
-    res.redirect(`${CLIENT_URL}/auth/callback?token=${jwt}`);
+    res.redirect(`${CLIENT_URL}/?token=${jwt}`);
 
   } catch (err) {
     console.error('OAuth2 error:', err);
