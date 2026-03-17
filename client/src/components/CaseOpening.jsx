@@ -165,6 +165,11 @@ export default function CaseOpening({ isOpen, onClose }) {
     stopAllAudio();
   };
 
+  const handleClose = () => {
+    stopAllAudio();
+    onClose?.();
+  };
+
   const handleOpen = async (caseData) => {
     if (opening || sellingAll) return;
     const nextAmount = caseData.price === 0 ? 1 : amount;
