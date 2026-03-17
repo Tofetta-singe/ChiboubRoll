@@ -38,6 +38,8 @@ const RARITY_ORDER = [
   'Contraband',
 ];
 
+const FEED_MIN_RARITY = 'Covert';
+
 const WEAR_TIERS = [
   { short: 'FN', name: 'Factory New', min: 0.0, max: 0.07, multiplier: 2.5 },
   { short: 'MW', name: 'Minimal Wear', min: 0.07, max: 0.15, multiplier: 1.5 },
@@ -229,6 +231,12 @@ const CASES = [
   },
 ];
 
+for (const caseData of CASES) {
+  if (caseData.id !== 'case_gratuite') {
+    caseData.drops = createCaseDrops(caseData.price);
+  }
+}
+
 const BATTLEPASS_TIERS = [
   { id: 'bp_01', spinsRequired: 5, reward: { type: 'coins', amount: 100 } },
   { id: 'bp_02', spinsRequired: 12, reward: { type: 'skin', rarity: 'Mil-Spec Grade', label: 'Drop Mil-Spec' } },
@@ -253,19 +261,19 @@ const activeSpinRequests = new Set();
 const liveDrops = [];
 
 const UPGRADES = {
-  extra_wheel: { baseCost: 150, costScale: 2.8, maxLevel: 3 },
-  turbo_spin: { baseCost: 100, costScale: 1.5, maxLevel: 3 },
-  multiplier: { baseCost: 250, costScale: 1.35, maxLevel: 3 },
-  lucky: { baseCost: 500, costScale: 1.8, maxLevel: 3 },
-  auto_spin: { baseCost: 1000, costScale: 2.2, maxLevel: 3 },
-  mega_segments: { baseCost: 1500, costScale: 2.5, maxLevel: 3 },
-  coin_magnet: { baseCost: 200, costScale: 1.25, maxLevel: 3 },
-  power_roll: { baseCost: 2000, costScale: 2.5, maxLevel: 3 },
-  power_roll_boost: { baseCost: 3000, costScale: 2.0, maxLevel: 3 },
-  power_roll_freq: { baseCost: 5000, costScale: 1.8, maxLevel: 3 },
-  diamond_rain: { baseCost: 10000, costScale: 2.2, maxLevel: 3 },
-  combo_streak: { baseCost: 1200, costScale: 1.4, maxLevel: 3 },
-  jackpot_chance: { baseCost: 25000, costScale: 3.5, maxLevel: 3 },
+  extra_wheel: { baseCost: 300, costScale: 3.2, maxLevel: 2 },
+  turbo_spin: { baseCost: 180, costScale: 1.8, maxLevel: 3 },
+  multiplier: { baseCost: 450, costScale: 1.7, maxLevel: 3 },
+  lucky: { baseCost: 900, costScale: 2.1, maxLevel: 3 },
+  auto_spin: { baseCost: 1800, costScale: 2.8, maxLevel: 3 },
+  mega_segments: { baseCost: 2600, costScale: 3.0, maxLevel: 2 },
+  coin_magnet: { baseCost: 500, costScale: 1.6, maxLevel: 3 },
+  power_roll: { baseCost: 4200, costScale: 2.8, maxLevel: 3 },
+  power_roll_boost: { baseCost: 5500, costScale: 2.4, maxLevel: 3 },
+  power_roll_freq: { baseCost: 7000, costScale: 2.2, maxLevel: 3 },
+  diamond_rain: { baseCost: 14000, costScale: 2.5, maxLevel: 3 },
+  combo_streak: { baseCost: 2200, costScale: 1.7, maxLevel: 3 },
+  jackpot_chance: { baseCost: 42000, costScale: 4.0, maxLevel: 2 },
 };
 
 function getUpgradeCost(upgradeId, currentLevel) {
@@ -303,7 +311,12 @@ function createLiveDrop(payload) {
   io.emit('global:drop', payload);
 }
 
+function shouldEmitFeedDrop(rarity) {
+  return RARITY_ORDER.indexOf(rarity) >= RARITY_ORDER.indexOf(FEED_MIN_RARITY);
+}
+
 function emitGlobalDrop(user, item, caseName, source = 'case') {
+  if (!shouldEmitFeedDrop(item.rarity)) return;
   createLiveDrop({
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     source,
@@ -340,6 +353,60 @@ function rollSkinFromCase(caseData) {
   return { skin, rarity: chosenRarity };
 }
 
+function createCaseDrops(price) {
+  if (price <= 25) {
+    return [
+      { rarity: 'Consumer Grade', weight: 68 },
+      { rarity: 'Industrial Grade', weight: 21 },
+      { rarity: 'Mil-Spec Grade', weight: 8 },
+      { rarity: 'Restricted', weight: 2.6 },
+      { rarity: 'Classified', weight: 0.35 },
+      { rarity: 'Covert', weight: 0.05 },
+    ];
+  }
+
+  if (price <= 100) {
+    return [
+      { rarity: 'Consumer Grade', weight: 56 },
+      { rarity: 'Industrial Grade', weight: 24 },
+      { rarity: 'Mil-Spec Grade', weight: 13 },
+      { rarity: 'Restricted', weight: 5.5 },
+      { rarity: 'Classified', weight: 1.25 },
+      { rarity: 'Covert', weight: 0.25 },
+    ];
+  }
+
+  if (price <= 400) {
+    return [
+      { rarity: 'Industrial Grade', weight: 29 },
+      { rarity: 'Mil-Spec Grade', weight: 34 },
+      { rarity: 'Restricted', weight: 23 },
+      { rarity: 'Classified', weight: 10.5 },
+      { rarity: 'Covert', weight: 2.2 },
+      { rarity: 'Extraordinary', weight: 1.3 },
+    ];
+  }
+
+  if (price <= 1200) {
+    return [
+      { rarity: 'Mil-Spec Grade', weight: 28 },
+      { rarity: 'Restricted', weight: 34 },
+      { rarity: 'Classified', weight: 24 },
+      { rarity: 'Covert', weight: 9.5 },
+      { rarity: 'Extraordinary', weight: 3.2 },
+      { rarity: 'Contraband', weight: 1.3 },
+    ];
+  }
+
+  return [
+    { rarity: 'Restricted', weight: 31 },
+    { rarity: 'Classified', weight: 34 },
+    { rarity: 'Covert', weight: 23 },
+    { rarity: 'Extraordinary', weight: 9.5 },
+    { rarity: 'Contraband', weight: 2.5 },
+  ];
+}
+
 function generateStrip(caseData, winningItem) {
   const strip = [];
   for (let i = 0; i < 40; i++) {
@@ -371,11 +438,11 @@ function getServerSegments(wheelIndex, upgrades) {
   const megaLevel = upgrades.mega_segments || 0;
   const values = [5, 5, 5, 10, 5, 5, 15, 5, 5, 10, 5, 25];
   if (megaLevel >= 1) {
-    values[6] = 30;
-    values.push(40);
+    values[6] = 20;
+    values.push(30);
   }
-  if (megaLevel >= 2) values.push(80);
-  if (megaLevel >= 3) values.push(150);
+  if (megaLevel >= 2) values.push(55);
+  if (megaLevel >= 3) values.push(90);
   return values;
 }
 
@@ -503,15 +570,15 @@ app.post('/api/spin', authMiddleware, (req, res) => {
 
     const upgrades = db.getUpgrades(req.userId);
     const multiplierLevel = upgrades.multiplier || 0;
-    const coinMultiplier = Math.pow(1.8, multiplierLevel);
-    const magnetBonus = 1 + (upgrades.coin_magnet || 0) * 0.1;
+    const coinMultiplier = Math.pow(1.35, multiplierLevel);
+    const magnetBonus = 1 + (upgrades.coin_magnet || 0) * 0.05;
     const wheelCount = 1 + (upgrades.extra_wheel || 0);
     const luckyLevel = upgrades.lucky || 0;
     const powerRollLevel = upgrades.power_roll || 0;
     const powerBoostLevel = upgrades.power_roll_boost || 0;
     const powerFreqLevel = upgrades.power_roll_freq || 0;
-    const powerRollThreshold = Math.max(10, 25 - powerFreqLevel * 3);
-    const powerRollMultiplier = 5 + powerBoostLevel * 2;
+    const powerRollThreshold = Math.max(16, 36 - powerFreqLevel * 4);
+    const powerRollMultiplier = 2.5 + powerBoostLevel * 0.75;
     const spinsBeforePower = user.spins_since_power || 0;
     const isPowerRoll = powerRollLevel > 0 && spinsBeforePower >= powerRollThreshold - 1;
 
@@ -519,10 +586,10 @@ app.post('/api/spin', authMiddleware, (req, res) => {
     const lastSpinTime = user.last_spin_at ? new Date(`${user.last_spin_at}Z`).getTime() : 0;
     let currentStreak = user.spin_streak || 0;
     if (Date.now() - lastSpinTime > 30_000) currentStreak = 0;
-    const streakBonus = comboLevel > 0 ? 1 + currentStreak * 0.05 * comboLevel : 1;
+    const streakBonus = comboLevel > 0 ? 1 + currentStreak * 0.025 * comboLevel : 1;
 
-    const diamondProc = (upgrades.diamond_rain || 0) > 0 && Math.random() < (upgrades.diamond_rain || 0) * 0.05;
-    const jackpotProc = (upgrades.jackpot_chance || 0) > 0 && Math.random() < (upgrades.jackpot_chance || 0) * 0.02;
+    const diamondProc = (upgrades.diamond_rain || 0) > 0 && Math.random() < (upgrades.diamond_rain || 0) * 0.015;
+    const jackpotProc = (upgrades.jackpot_chance || 0) > 0 && Math.random() < (upgrades.jackpot_chance || 0) * 0.004;
 
     let totalWin = 0;
     const results = [];
@@ -531,7 +598,7 @@ app.post('/api/spin', authMiddleware, (req, res) => {
       const segments = getServerSegments(wheelIndex, upgrades);
       let winIndex;
 
-      if (luckyLevel > 0 && Math.random() < luckyLevel * 0.12) {
+      if (luckyLevel > 0 && Math.random() < luckyLevel * 0.07) {
         const sorted = segments.map((value, index) => ({ value, index })).sort((a, b) => b.value - a.value);
         const topThird = sorted.slice(0, Math.ceil(sorted.length / 3));
         winIndex = topThird[Math.floor(Math.random() * topThird.length)].index;
@@ -680,6 +747,26 @@ app.post('/api/inventory/sell', authMiddleware, (req, res) => {
   db.deleteInventoryItem(itemId, req.userId);
   const updatedUser = db.setCoins(req.userId, user.coins + item.sell_value);
   res.json({ coins: updatedUser.coins, soldValue: item.sell_value });
+});
+
+app.post('/api/inventory/sell-many', authMiddleware, (req, res) => {
+  const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds.map(Number).filter(Boolean) : [];
+  if (itemIds.length === 0) return res.status(400).json({ error: 'Aucun skin a vendre' });
+
+  const user = db.getUser(req.userId);
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouve' });
+
+  const result = db.sellInventoryItems(req.userId, itemIds);
+  if (result.soldItemIds.length === 0) {
+    return res.status(404).json({ error: 'Aucun skin valide a vendre' });
+  }
+
+  const updatedUser = db.setCoins(req.userId, user.coins + result.totalValue);
+  res.json({
+    coins: updatedUser.coins,
+    soldValue: result.totalValue,
+    soldItemIds: result.soldItemIds,
+  });
 });
 
 app.post('/api/profile/showcase', authMiddleware, (req, res) => {

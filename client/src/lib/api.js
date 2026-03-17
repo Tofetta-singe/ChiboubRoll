@@ -71,6 +71,15 @@ export async function sellSkin(token, itemId) {
   return parseResponse(res, 'Echec de la vente');
 }
 
+export async function sellManySkins(token, itemIds) {
+  const res = await fetch(`${API_BASE}/api/inventory/sell-many`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify({ itemIds }),
+  });
+  return parseResponse(res, 'Echec de la vente groupee');
+}
+
 export async function setShowcaseSkin(token, itemId) {
   const res = await fetch(`${API_BASE}/api/profile/showcase`, {
     method: 'POST',

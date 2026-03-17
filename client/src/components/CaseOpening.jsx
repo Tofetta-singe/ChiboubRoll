@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fetchCases, openCase, sellSkin } from '../lib/api';
+import { fetchCases, openCase, sellManySkins, sellSkin } from '../lib/api';
 
-const STRIP_ITEM_WIDTH = 84;
-const STRIP_GAP = 8;
+const STRIP_ITEM_WIDTH = 108;
+const STRIP_GAP = 10;
 
 export default function CaseOpening({ isOpen, onClose }) {
   const { token, user, updateUserData } = useAuth();
@@ -66,10 +66,10 @@ export default function CaseOpening({ isOpen, onClose }) {
           div.className = 'case-strip-item';
           div.style.borderColor = item.rarity_color;
           div.innerHTML = `
-            <div style="width:100%;height:40px;display:flex;align-items:center;justify-content:center;padding:0 4px;overflow:hidden;">
+            <div style="width:100%;height:54px;display:flex;align-items:center;justify-content:center;padding:0 4px;overflow:hidden;">
               ${item.skin_image
-                ? `<img src="${item.skin_image}" alt="" style="max-width:64px;max-height:34px;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.45));" />`
-                : `<div style="width:56px;height:24px;border-radius:8px;background:${item.rarity_color}22;"></div>`}
+                ? `<img src="${item.skin_image}" alt="" style="max-width:88px;max-height:46px;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.45));" />`
+                : `<div style="width:72px;height:32px;border-radius:8px;background:${item.rarity_color}22;"></div>`}
             </div>
             <div style="font-size:9px;font-weight:800;color:${item.rarity_color};text-align:center;padding:0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">
               ${item.skin_name}
@@ -101,6 +101,20 @@ export default function CaseOpening({ isOpen, onClose }) {
       const data = await sellSkin(token, item.id);
       updateUserData({ coins: data.coins });
       setResults((prev) => prev.filter((entry) => entry.item.id !== item.id));
+      showToast(`+${data.soldValue} CC`, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const handleSellAll = async () => {
+    const itemIds = results.map((entry) => entry.item.id);
+    if (itemIds.length === 0) return;
+
+    try {
+      const data = await sellManySkins(token, itemIds);
+      updateUserData({ coins: data.coins });
+      setResults((prev) => prev.filter((entry) => !data.soldItemIds.includes(entry.item.id)));
       showToast(`+${data.soldValue} CC`, 'success');
     } catch (error) {
       showToast(error.message, 'error');
@@ -185,9 +199,20 @@ export default function CaseOpening({ isOpen, onClose }) {
 
               {(opening || results.length > 0) ? (
                 <div className="space-y-6">
+                  {results.length > 1 && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleSellAll}
+                        className="rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 px-4 py-2 text-dark-900 font-black text-sm"
+                      >
+                        Vendre les {results.length} skins
+                      </button>
+                    </div>
+                  )}
+
                   {results.map((entry, index) => (
                     <div key={entry.item.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-28 mb-4">
+                      <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-32 mb-4">
                         <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10" />
                         <div className="relative h-full overflow-hidden">
                           <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-2 absolute top-0 left-0" />
@@ -240,7 +265,7 @@ export default function CaseOpening({ isOpen, onClose }) {
         .case-strip-item {
           min-width: ${STRIP_ITEM_WIDTH}px;
           max-width: ${STRIP_ITEM_WIDTH}px;
-          height: 76px;
+          height: 92px;
           display: flex;
           flex-direction: column;
           align-items: center;

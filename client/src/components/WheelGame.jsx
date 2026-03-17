@@ -7,13 +7,13 @@ function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
   const multiplierLevel = activeUpgrades.multiplier || 0;
   const magnetLevel = activeUpgrades.coin_magnet || 0;
 
-  const coinMultiplier = Math.pow(1.8, multiplierLevel);
-  const magnetBonus = 1 + magnetLevel * 0.1;
+  const coinMultiplier = Math.pow(1.35, multiplierLevel);
+  const magnetBonus = 1 + magnetLevel * 0.05;
   let wheelMultiplier = coinMultiplier * magnetBonus;
 
   if (isPowerActive) {
     const powerBoostLevel = activeUpgrades.power_roll_boost || 0;
-    wheelMultiplier *= 5 + powerBoostLevel * 2;
+    wheelMultiplier *= 2.5 + powerBoostLevel * 0.75;
   }
 
   let values = [
@@ -31,9 +31,9 @@ function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
     { base: 25, color: '#e6941e' },
   ];
 
-  if (megaLevel >= 1) { values[6].base = 30; values.push({ base: 40, color: '#d4790f' }); }
-  if (megaLevel >= 2) values.push({ base: 80, color: '#c46a0a' });
-  if (megaLevel >= 3) values.push({ base: 150, color: '#b35b05' });
+  if (megaLevel >= 1) { values[6].base = 20; values.push({ base: 30, color: '#d4790f' }); }
+  if (megaLevel >= 2) values.push({ base: 55, color: '#c46a0a' });
+  if (megaLevel >= 3) values.push({ base: 90, color: '#b35b05' });
 
   return values.map((value) => {
     const finalValue = Math.floor(value.base * wheelMultiplier);

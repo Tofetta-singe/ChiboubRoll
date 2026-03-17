@@ -212,6 +212,22 @@ const swapTradeItemsTx = db.transaction((userAId, userAItemIds, userBId, userBIt
   }
 });
 
+const sellInventoryItemsTx = db.transaction((userId, itemIds) => {
+  let totalValue = 0;
+  const soldItemIds = [];
+
+  for (const itemId of itemIds) {
+    const item = stmts.getInventoryItemForUser.get(itemId, userId);
+    if (!item) continue;
+    stmts.clearShowcaseItem.run(userId, itemId);
+    stmts.deleteInventoryItem.run(itemId, userId);
+    totalValue += item.sell_value;
+    soldItemIds.push(itemId);
+  }
+
+  return { totalValue, soldItemIds };
+});
+
 module.exports = {
   getUser(id) {
     return stmts.getUser.get(id);
@@ -324,6 +340,10 @@ module.exports = {
 
   swapTradeItems(userAId, userAItemIds, userBId, userBItemIds) {
     swapTradeItemsTx(userAId, userAItemIds, userBId, userBItemIds);
+  },
+
+  sellInventoryItems(userId, itemIds) {
+    return sellInventoryItemsTx(userId, itemIds);
   },
 
   close() {
