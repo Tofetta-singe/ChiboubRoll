@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './context/AuthContext';
 import { API_BASE } from './lib/api';
@@ -26,6 +26,30 @@ export default function App() {
   const [tradeRoom, setTradeRoom] = useState(null);
   const [tradeNotice, setTradeNotice] = useState(null);
   const [onlineUserIds, setOnlineUserIds] = useState([]);
+  const buttonAudioRef = useRef(null);
+
+  useEffect(() => {
+    const audio = new Audio('/sounds/sound_ui_buttonclick.wav');
+    audio.preload = 'auto';
+    buttonAudioRef.current = audio;
+
+    const handlePointerDown = (event) => {
+      const target = event.target instanceof Element ? event.target.closest('button') : null;
+      if (!target || target.disabled) return;
+      const volume = Number(localStorage.getItem('chiboub_sfx_volume'));
+      const safeVolume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.18;
+      const clickAudio = buttonAudioRef.current?.cloneNode();
+      if (!clickAudio) return;
+      clickAudio.volume = safeVolume * 0.32;
+      clickAudio.play().catch(() => {});
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      buttonAudioRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {

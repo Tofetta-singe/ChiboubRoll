@@ -86,15 +86,13 @@ export default function CaseOpening({ isOpen, onClose }) {
   }, []);
 
   useEffect(() => {
-    if (!isOpen) {
-      stopAllAudio();
-    }
+    if (!isOpen) stopAllAudio();
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     fetchCases()
-      .then((data) => setCases(data.cases || []))
+      .then((data) => setCases([...(data.cases || [])].sort((a, b) => a.price - b.price)))
       .catch((error) => showToast(error.message, 'error'));
   }, [isOpen]);
 
@@ -131,14 +129,14 @@ export default function CaseOpening({ isOpen, onClose }) {
     if (!audio) return;
     applyAudioVolumes(sfxVolume);
     audio.currentTime = 0;
-    audio.playbackRate = 1.85;
+    audio.playbackRate = 2.45;
     clearScrollRateTimer();
     const startTime = Date.now();
     scrollRateTimerRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(1, elapsed / durationMs);
       const eased = 1 - (1 - progress) * (1 - progress);
-      audio.playbackRate = 1.85 - eased * 1.15;
+      audio.playbackRate = 2.45 - eased * 1.75;
       if (progress >= 1) {
         audio.playbackRate = 0.7;
         clearScrollRateTimer();
@@ -146,23 +144,22 @@ export default function CaseOpening({ isOpen, onClose }) {
     }, 60);
     try {
       await audio.play();
-    } catch {
-      // Ignore autoplay failure; user interaction usually unlocks audio on next click.
-    }
+    } catch {}
   };
 
   const playRevealBurst = (items) => {
     clearRevealTimeouts();
-    items.forEach((entry, index) => {
-      const timeout = setTimeout(() => {
-        const source = isLegendaryItem(entry.item) ? legendaryRevealAudioRef.current : basicRevealAudioRef.current;
-        if (!source) return;
-        const nextSound = source.cloneNode();
-        nextSound.volume = source.volume;
-        nextSound.play().catch(() => {});
-      }, index * 170);
-      revealTimeoutsRef.current.push(timeout);
-    });
+    const highestRarityItem = [...items]
+      .map((entry) => entry.item)
+      .sort((a, b) => Number(isLegendaryItem(b)) - Number(isLegendaryItem(a)))[0];
+    const timeout = setTimeout(() => {
+      const source = isLegendaryItem(highestRarityItem) ? legendaryRevealAudioRef.current : basicRevealAudioRef.current;
+      if (!source) return;
+      const nextSound = source.cloneNode();
+      nextSound.volume = source.volume;
+      nextSound.play().catch(() => {});
+    }, 100);
+    revealTimeoutsRef.current.push(timeout);
   };
 
   const showToast = (msg, type = 'success') => {
@@ -186,7 +183,6 @@ export default function CaseOpening({ isOpen, onClose }) {
 
   const handleOpen = async (caseData) => {
     if (opening || sellingAll) return;
-
     const nextAmount = caseData.price === 0 ? 1 : amount;
     if ((user?.coins || 0) < caseData.price * nextAmount) {
       showToast('Pas assez de Chiboub Coins!', 'error');
@@ -226,21 +222,18 @@ export default function CaseOpening({ isOpen, onClose }) {
 
         strip.innerHTML = '';
         const paddedStrip = [...entry.strip, ...entry.strip.slice(0, 12)];
-
         paddedStrip.forEach((item) => {
           const div = document.createElement('div');
           div.className = 'case-strip-item';
           div.style.borderColor = item.rarity_color;
           div.innerHTML = `
-            <div style="width:100%;height:64px;display:flex;align-items:center;justify-content:center;padding:0 4px;overflow:hidden;">
+            <div style="width:100%;height:56px;display:flex;align-items:center;justify-content:center;padding:0 4px;overflow:hidden;">
               ${item.skin_image
-                ? `<img src="${item.skin_image}" alt="" style="max-width:106px;max-height:60px;object-fit:contain;filter:drop-shadow(0 5px 10px rgba(0,0,0,0.45));transform:scale(1.08);" />`
-                : `<div style="width:84px;height:36px;border-radius:8px;background:${item.rarity_color}22;"></div>`}
+                ? `<img src="${item.skin_image}" alt="" style="max-width:96px;max-height:52px;object-fit:contain;filter:drop-shadow(0 5px 10px rgba(0,0,0,0.45));transform:scale(1.06);" />`
+                : `<div style="width:78px;height:34px;border-radius:8px;background:${item.rarity_color}22;"></div>`}
             </div>
-            <div style="font-size:9px;font-weight:800;color:${item.rarity_color};text-align:center;padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">
-              ${item.skin_name}
-            </div>
-            <div style="font-size:8px;color:#cbd5e1">${item.wear_short} ${Number(item.float_value).toFixed(4)}</div>
+            <div style="font-size:8px;font-weight:800;color:${item.rarity_color};text-align:center;padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">${item.skin_name}</div>
+            <div style="font-size:7px;color:#cbd5e1">${item.wear_short} ${Number(item.float_value).toFixed(4)}</div>
           `;
           strip.appendChild(div);
         });
@@ -249,7 +242,6 @@ export default function CaseOpening({ isOpen, onClose }) {
         const targetOffset = WINNING_INDEX * (STRIP_ITEM_WIDTH + STRIP_GAP) - containerWidth / 2 + STRIP_ITEM_WIDTH / 2;
         strip.style.transition = 'none';
         strip.style.transform = 'translateX(0)';
-
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             strip.style.transition = `transform ${3.5 + index * 0.15}s cubic-bezier(0.15, 0.85, 0.35, 1)`;
@@ -275,7 +267,6 @@ export default function CaseOpening({ isOpen, onClose }) {
   const handleSell = async (item) => {
     if (sellingIds.includes(item.id) || sellingAll) return;
     setSellingIds((prev) => [...prev, item.id]);
-
     try {
       const data = await sellSkin(token, item.id);
       updateUserData({ coins: data.coins });
@@ -283,9 +274,7 @@ export default function CaseOpening({ isOpen, onClose }) {
       setResults(nextResults);
       setRevealedItemIds((prev) => prev.filter((id) => id !== item.id));
       showToast(`Skin vendue: +${data.soldValue} CC`, 'success');
-      if (nextResults.length === 0) {
-        setTimeout(() => resetOpeningState(), 250);
-      }
+      if (nextResults.length === 0) setTimeout(() => resetOpeningState(), 250);
     } catch (error) {
       showToast(error.message, 'error');
     } finally {
@@ -297,7 +286,6 @@ export default function CaseOpening({ isOpen, onClose }) {
     const itemIds = results.map((entry) => entry.item.id);
     if (itemIds.length === 0 || sellingAll) return;
     setSellingAll(true);
-
     try {
       const data = await sellManySkins(token, itemIds);
       updateUserData({ coins: data.coins });
@@ -320,31 +308,16 @@ export default function CaseOpening({ isOpen, onClose }) {
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             <div>
               <h2 className="text-3xl font-black bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Case Opening</h2>
-              <p className="text-sm text-gray-500">Multi-ouverture jusqu a 5 caisses avec audio reglable.</p>
+              <p className="text-sm text-gray-500">Multi-ouverture jusqu a 5 caisses.</p>
             </div>
             <button onClick={handleClose} className="w-10 h-10 rounded-full glass text-gray-400 hover:text-white">✕</button>
           </div>
 
-          <div className="flex-1 overflow-hidden grid grid-cols-[360px_1fr] max-[1100px]:grid-cols-1">
+          <div className="flex-1 overflow-hidden grid grid-cols-[340px_1fr] max-[1100px]:grid-cols-1">
             <div className="border-r border-white/10 p-5 overflow-y-auto max-[1100px]:border-r-0 max-[1100px]:border-b">
-              <div className="mb-4 rounded-2xl border border-white/10 bg-dark-950/70 px-4 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-gray-500">SFX</div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <div className="text-sm text-gray-300">Volume d ouverture</div>
-                  <div className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-black text-cyan-300">
-                    {Math.round(sfxVolume * 100)}%
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-gray-500">Tu peux le changer a tout moment dans Settings.</div>
-              </div>
-
               <div className="flex gap-2 mb-4">
                 {[1, 2, 3, 4, 5].map((qty) => (
-                  <button
-                    key={qty}
-                    onClick={() => setAmount(qty)}
-                    className={`flex-1 rounded-xl py-2 text-sm font-bold ${amount === qty ? 'bg-orange-500 text-white' : 'bg-white/5 text-gray-400'}`}
-                  >
+                  <button key={qty} onClick={() => setAmount(qty)} className={`flex-1 rounded-xl py-2 text-sm font-bold ${amount === qty ? 'bg-orange-500 text-white' : 'bg-white/5 text-gray-400'}`}>
                     {qty}x
                   </button>
                 ))}
@@ -354,22 +327,14 @@ export default function CaseOpening({ isOpen, onClose }) {
                 {cases.map((caseData) => {
                   const price = caseData.price * (caseData.price === 0 ? 1 : amount);
                   return (
-                    <button
-                      key={caseData.id}
-                      onClick={() => handleOpen(caseData)}
-                      className="w-full p-4 rounded-2xl border border-white/10 bg-white/[0.03] text-left hover:bg-white/[0.05]"
-                    >
+                    <button key={caseData.id} onClick={() => handleOpen(caseData)} className="w-full p-4 rounded-2xl border border-white/10 bg-white/[0.03] text-left hover:bg-white/[0.05]">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl" style={{ background: `${caseData.color}22` }}>
-                          {caseData.icon}
-                        </div>
+                        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl" style={{ background: `${caseData.color}22` }}>{caseData.icon}</div>
                         <div className="flex-1">
                           <div className="font-black text-sm" style={{ color: caseData.color }}>{caseData.name}</div>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {caseData.drops.map((drop) => (
-                              <span key={drop.rarity} className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: `${drop.color}22`, color: drop.color }}>
-                                {drop.rarity}
-                              </span>
+                              <span key={drop.rarity} className="text-[10px] px-2 py-1 rounded-full font-bold" style={{ background: `${drop.color}22`, color: drop.color }}>{drop.rarity}</span>
                             ))}
                           </div>
                         </div>
@@ -381,9 +346,9 @@ export default function CaseOpening({ isOpen, onClose }) {
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto">
+            <div className="p-5 overflow-hidden flex flex-col">
               {selectedCase && (
-                <div className="mb-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+                <div className="mb-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4 shrink-0">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-xs uppercase tracking-[0.3em] text-gray-500 font-black">Selection</div>
@@ -398,84 +363,74 @@ export default function CaseOpening({ isOpen, onClose }) {
               )}
 
               {(opening || results.length > 0) ? (
-                <div className="space-y-6">
+                <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
                   {results.length > 0 && (
-                    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-dark-950/60 px-4 py-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-dark-950/60 px-4 py-3 shrink-0">
                       <div className="text-sm text-gray-300">
-                        {opening ? 'Ouverture en cours avec scroll audio...' : sellingAll ? 'Vente de tous les skins en cours...' : `${results.length} skin${results.length > 1 ? 's' : ''} a gerer`}
+                        {opening ? 'Ouverture en cours...' : sellingAll ? 'Vente de tous les skins en cours...' : `${results.length} skin${results.length > 1 ? 's' : ''} a gerer`}
                       </div>
                       {results.length > 1 && (
-                        <button
-                          onClick={handleSellAll}
-                          disabled={sellingAll || opening}
-                          className="rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 px-4 py-2 text-dark-900 font-black text-sm disabled:opacity-50"
-                        >
+                        <button onClick={handleSellAll} disabled={sellingAll || opening} className="rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 px-4 py-2 text-dark-900 font-black text-sm disabled:opacity-50">
                           {sellingAll ? 'Vente...' : `Vendre les ${results.length} skins`}
                         </button>
                       )}
                     </div>
                   )}
 
-                  {results.map((entry, index) => {
-                    const isSelling = sellingIds.includes(entry.item.id);
-                    const isRevealed = revealedItemIds.includes(entry.item.id);
-                    return (
-                      <div key={entry.item.id} className={`rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition-all ${isSelling ? 'opacity-60' : ''} ${isRevealed ? 'case-reveal-card' : ''}`}>
-                        <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-36 mb-4 case-strip-shell">
-                          <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-dark-950 to-transparent z-[11]" />
-                          <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-dark-950 to-transparent z-[11]" />
-                          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10 case-center-beam" />
-                          <div className="absolute inset-0 case-strip-shine pointer-events-none z-[9]" />
-                          <div className="relative h-full overflow-hidden">
-                            <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-[10px] absolute top-0 left-0" />
+                  <div className={`grid gap-3 min-h-0 overflow-hidden ${results.length <= 2 ? 'grid-cols-1' : 'grid-cols-2 max-[1350px]:grid-cols-1'} auto-rows-fr`}>
+                    {results.map((entry, index) => {
+                      const isSelling = sellingIds.includes(entry.item.id);
+                      const isRevealed = revealedItemIds.includes(entry.item.id);
+                      return (
+                        <div key={entry.item.id} className={`rounded-3xl border border-white/10 bg-white/[0.03] p-3 transition-all flex flex-col min-h-0 ${isSelling ? 'opacity-60' : ''} ${isRevealed ? 'case-reveal-card' : ''}`}>
+                          <div className="relative overflow-hidden rounded-2xl bg-dark-950 h-28 mb-3 case-strip-shell shrink-0">
+                            <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-dark-950 to-transparent z-[11]" />
+                            <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-dark-950 to-transparent z-[11]" />
+                            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] bg-yellow-400 z-10 case-center-beam" />
+                            <div className="absolute inset-0 case-strip-shine pointer-events-none z-[9]" />
+                            <div className="relative h-full overflow-hidden">
+                              <div ref={(el) => { stripRefs.current[index] = el; }} className="flex items-center h-full gap-[10px] absolute top-0 left-0" />
+                            </div>
                           </div>
-                        </div>
 
-                        <div className={`flex items-center justify-between rounded-2xl border p-4 gap-4 transition-all ${isRevealed ? 'border-white/15 bg-dark-950/85 shadow-[0_0_35px_rgba(250,204,21,0.12)]' : 'border-white/10 bg-dark-950/70'}`}>
-                          <div className="flex items-center gap-4 min-w-0">
-                            <div className={`w-24 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden transition-all ${isRevealed ? 'bg-black/30' : 'bg-white/5 animate-pulse'}`}>
-                              {isRevealed && entry.item.skin_image ? (
-                                <img src={entry.item.skin_image} alt={entry.item.skin_name} className="max-w-[88px] max-h-[52px] object-contain" />
-                              ) : (
-                                <div className="h-8 w-16 rounded-lg bg-white/10" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-black truncate" style={{ color: isRevealed ? entry.item.rarity_color : '#e2e8f0' }}>
-                                {isRevealed ? entry.item.skin_name : 'Skin en reveal...'}
+                          <div className={`flex items-center justify-between rounded-2xl border p-3 gap-3 transition-all flex-1 min-h-0 ${isRevealed ? 'border-white/15 bg-dark-950/85 shadow-[0_0_35px_rgba(250,204,21,0.12)]' : 'border-white/10 bg-dark-950/70'}`}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-20 h-14 rounded-xl flex items-center justify-center shrink-0 overflow-hidden transition-all ${isRevealed ? 'bg-black/30' : 'bg-white/5 animate-pulse'}`}>
+                                {isRevealed && entry.item.skin_image ? (
+                                  <img src={entry.item.skin_image} alt={entry.item.skin_name} className="max-w-[74px] max-h-[44px] object-contain" />
+                                ) : (
+                                  <div className="h-8 w-16 rounded-lg bg-white/10" />
+                                )}
                               </div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                {isRevealed ? `${entry.item.rarity} • ${entry.item.wear_short} • ${Number(entry.item.float_value).toFixed(4)}` : 'Le resultat reste masque jusqu a la fin du spin'}
-                              </div>
-                              {isRevealed && (
-                                <div className={`mt-2 text-[11px] font-bold ${isLegendaryItem(entry.item) ? 'text-amber-300' : 'text-cyan-300'}`}>
-                                  {isLegendaryItem(entry.item) ? 'Reveal legendary' : 'Reveal standard'}
+                              <div className="min-w-0">
+                                <div className="text-sm font-black truncate" style={{ color: isRevealed ? entry.item.rarity_color : '#e2e8f0' }}>
+                                  {isRevealed ? entry.item.skin_name : 'Skin en reveal...'}
                                 </div>
-                              )}
-                              {isSelling && <div className="text-[11px] font-bold text-amber-300 mt-2">Vente en cours...</div>}
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {isRevealed ? `${entry.item.rarity} • ${entry.item.wear_short} • ${Number(entry.item.float_value).toFixed(4)}` : 'Le resultat reste masque jusqu a la fin du spin'}
+                                </div>
+                                {isRevealed && (
+                                  <div className={`mt-2 text-[11px] font-bold ${isLegendaryItem(entry.item) ? 'text-amber-300' : 'text-cyan-300'}`}>
+                                    {isLegendaryItem(entry.item) ? 'Drop rare' : 'Drop standard'}
+                                  </div>
+                                )}
+                                {isSelling && <div className="text-[11px] font-bold text-amber-300 mt-2">Vente en cours...</div>}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className={`font-black ${isRevealed ? 'text-yellow-400' : 'text-gray-500'}`}>
-                              {isRevealed ? `${entry.item.sell_value} CC` : '???'}
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className={`font-black ${isRevealed ? 'text-yellow-400' : 'text-gray-500'}`}>{isRevealed ? `${entry.item.sell_value} CC` : '???'}</div>
+                              <button onClick={() => handleSell(entry.item)} disabled={isSelling || sellingAll || opening || !isRevealed} className="rounded-xl bg-yellow-500 px-3 py-2 text-dark-900 font-black text-sm disabled:opacity-50">
+                                {isSelling ? 'Vente...' : 'Vendre'}
+                              </button>
                             </div>
-                            <button
-                              onClick={() => handleSell(entry.item)}
-                              disabled={isSelling || sellingAll || opening || !isRevealed}
-                              className="rounded-xl bg-yellow-500 px-3 py-2 text-dark-900 font-black text-sm disabled:opacity-50"
-                            >
-                              {isSelling ? 'Vente...' : 'Vendre'}
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-500 text-lg">
-                  Choisis une caisse pour lancer l ouverture.
-                </div>
+                <div className="h-full flex items-center justify-center text-gray-500 text-lg">Choisis une caisse pour lancer l ouverture.</div>
               )}
             </div>
           </div>
@@ -492,17 +447,17 @@ export default function CaseOpening({ isOpen, onClose }) {
         .case-strip-item {
           min-width: ${STRIP_ITEM_WIDTH}px;
           max-width: ${STRIP_ITEM_WIDTH}px;
-          height: 104px;
+          height: 92px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          padding-top: 8px;
+          padding-top: 6px;
           border: 2px solid #555;
           border-radius: 14px;
           background: rgba(255,255,255,0.05);
           flex-shrink: 0;
-          gap: 4px;
+          gap: 3px;
           overflow: hidden;
         }
 

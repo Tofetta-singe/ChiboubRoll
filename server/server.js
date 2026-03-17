@@ -38,7 +38,7 @@ const RARITY_ORDER = [
   'Contraband',
 ];
 
-const FEED_MIN_RARITY = 'Covert';
+const FEED_MIN_RARITY = 'Restricted';
 
 const WEAR_TIERS = [
   { short: 'FN', name: 'Factory New', min: 0.0, max: 0.07, multiplier: 2.7 },

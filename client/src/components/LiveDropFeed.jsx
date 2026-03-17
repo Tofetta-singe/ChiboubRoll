@@ -22,7 +22,8 @@ export default function LiveDropFeed({ socket, onInviteTrade }) {
       <div className="h-full rounded-3xl border border-white/10 bg-dark-900/75 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden">
         <div className="px-5 py-4 border-b border-white/10">
           <div className="text-xs uppercase tracking-[0.35em] text-cyan-300/70 font-black">Live Feed</div>
-          <div className="text-lg font-black text-white">Toutes les ouvertures</div>
+          <div className="text-lg font-black text-white">Skins violets et +</div>
+          <div className="text-[11px] text-gray-500 mt-1">Le feed affiche seulement les drops violets, rouges et or.</div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
