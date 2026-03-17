@@ -182,9 +182,12 @@ app.post('/api/spin', authMiddleware, (req, res) => {
   let totalWin = 0;
   const results = [];
 
+  const goldenLevel = upgrades.golden_wheel || 0;
+
   for (let w = 0; w < wheelCount; w++) {
     const segments = getServerSegments(w, upgrades);
-
+    const isGolden = w < goldenLevel;
+    
     // Lucky selection
     let winIndex;
     if (luckyLevel > 0 && Math.random() < luckyLevel * 0.12) {

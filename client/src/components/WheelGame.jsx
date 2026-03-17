@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { doSpin } from '../lib/api';
 
 // ===== SEGMENT DEFINITIONS (mirrors server — BOOSTED x5) =====
-// ===== SEGMENT DEFINITIONS (mirrors server — BOOSTED x5) =====
 function getSegments(wheelIndex, activeUpgrades, isPowerActive = false) {
   const megaLevel = activeUpgrades.mega_segments || 0;
   const multiplierLevel = activeUpgrades.multiplier || 0;
@@ -118,17 +117,25 @@ function drawWheel(canvas, segments, rotation = 0, isPowerRoll = false) {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Label
+    // Label scaling based on number length
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(startAngle + segAngle / 2);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff';
-    ctx.font = `bold ${seg.value >= 100 ? 13 : 16}px Outfit, sans-serif`;
+    
+    // Scale font size based on text length
+    const labelStr = seg.label;
+    let fontSize = 16;
+    if (labelStr.length > 3) fontSize = 14;
+    if (labelStr.length > 5) fontSize = 11;
+    if (labelStr.length > 7) fontSize = 9;
+    
+    ctx.font = `bold ${fontSize}px Outfit, sans-serif`;
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 4;
-    ctx.fillText(seg.label, r * 0.65, 0);
+    ctx.fillText(labelStr, r * 0.65, 0);
     ctx.restore();
   });
 
@@ -152,6 +159,7 @@ function drawWheel(canvas, segments, rotation = 0, isPowerRoll = false) {
 }
 
 function formatNumber(n) {
+  if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
   if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
@@ -322,10 +330,11 @@ export default function WheelGame() {
 
     } catch (err) {
       console.error('Spin error:', err);
+      alert(`Erreur de spin: ${err.message}`);
     } finally {
       setSpinning(false);
     }
-  }, [spinning, token, megaLevel, spinDuration, updateUserData]);
+  }, [spinning, token, upgrades, megaLevel, spinDuration, updateUserData]);
 
   // Keyboard shortcut
   useEffect(() => {
